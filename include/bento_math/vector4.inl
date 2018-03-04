@@ -42,12 +42,12 @@ namespace bento {
 	}
 
 	// Cannonic operations
-	float dotProd(const Vector4& _v1, const Vector4& _v2)
+	float dot(const Vector4& _v1, const Vector4& _v2)
 	{
 		return _v1.x * _v2.x + _v1.y * _v2.y + _v1.z * _v2.z+ _v1.w * _v2.w;
 	}
 
-	Vector4 crossProd(const Vector4& _v1, const Vector4& _v2)
+	Vector4 cross(const Vector4& _v1, const Vector4& _v2)
 	{
 		return vector4(_v1.y*_v2.z - _v1.z * _v2.y, _v1.z*_v2.x - _v1.x * _v2.z, _v1.x*_v2.y - _v1.y * _v2.x, 0.0);
 	}

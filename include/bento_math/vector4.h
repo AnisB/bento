@@ -16,8 +16,8 @@ namespace bento
 	inline Vector4 operator-(const Vector4& _v1, const Vector4& _v2);
 
 		// Canonic operations
-	inline float dotProd(const Vector4& _v1, const Vector4& _v2);
-	inline Vector4 crossProd(const Vector4& _v1, const Vector4& _v2);
+	inline float dot(const Vector4& _v1, const Vector4& _v2);
+	inline Vector4 cross(const Vector4& _v1, const Vector4& _v2);
 	inline float length(const Vector4& _v1);
 	inline float length2(const Vector4& _v1);
 	inline Vector4 normalize(const Vector4& _vec);
