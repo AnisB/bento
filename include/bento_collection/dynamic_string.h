@@ -16,7 +16,6 @@ namespace bento {
 	{
 	public:
 		ALLOCATOR_BASED;
-
 		// Cst
 		DynamicString(IAllocator& allocator);
 		DynamicString(IAllocator& allocator, const char* str);
@@ -31,12 +30,22 @@ namespace bento {
 		DynamicString& operator=(const DynamicString& str);
 		DynamicString& operator=(const char* str);
 		DynamicString& operator+=(const char* str);
+		DynamicString& operator+=(const DynamicString& str);
 		bool operator==(const char* str) const;
+		bool operator!=(const char* str) const;
 
 	private:
 		Vector<char> _data;
+	public:
 		IAllocator& _allocator;
 	};
+
+
+	namespace string
+	{
+		// Get a substric from an original string
+		DynamicString substr(const DynamicString& source_string, uint32_t first_idx, uint32_t size);
+	}
 
 	void pack_type(Vector<char>& buffer, const DynamicString& str);
 	void unpack_type(const char*& stream, DynamicString& str);

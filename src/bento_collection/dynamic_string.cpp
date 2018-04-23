@@ -116,9 +116,30 @@ namespace bento
 		return *this;
 	}
 
+	DynamicString& DynamicString::operator+=(const DynamicString& str)
+	{
+		(*this) += str.c_str();
+		return *this;
+	}
+
 	bool DynamicString::operator==(const char* str) const
 	{
 		return strcmp(_data.begin(), str) == 0;
+	}
+
+	bool DynamicString::operator!=(const char* str) const
+	{
+		return !((*this) == str);
+	}
+
+	namespace string
+	{
+		DynamicString substr(const DynamicString& source_string, uint32_t first_idx, uint32_t size)
+		{
+			DynamicString result_string(source_string._allocator, size);
+			memcpy(result_string.str(), source_string.c_str() + first_idx, size);
+			return result_string;
+		}
 	}
 
 	void pack_type(Vector<char>& buffer, const DynamicString& str)

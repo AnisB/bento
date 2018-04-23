@@ -1,5 +1,7 @@
 // SDK includes
+#include "bento_base/log.h"
 #include "bento_tools/file_system.h"
+#include "bento_base/dirent.h"
 
 // External includes
 #include <stdio.h>
@@ -89,6 +91,82 @@ namespace bento {
 				memcpy(result.str(), file_path + dir_separator + 1, filename_size);
 			}
 			return result;
+		}
+	}
+
+	namespace file_system
+	{
+		bool path_is_file(const char* path)
+		{
+		    struct stat path_stat;
+		    stat(path, &path_stat);
+		    return S_ISREG(path_stat.st_mode) != 0;
+		}
+
+		void collect_files_with_extension(const char* root_path, const char* target_extension, Vector<DynamicString>& output_list)
+		{
+	        // Opening the directory
+	        DIR * directory;
+	        directory = opendir (root_path);
+
+	        if (! directory) 
+	        {
+				default_logger()->log(LogLevel::error, "FILE_SYSTEM", "Error in directory.");
+				return;
+	        }
+
+	        uint32_t extensionSize = (uint32_t)strlen(target_extension);
+
+	        // For each entry in the directory
+	        while (1) 
+	        {
+	        	// If each new entry
+	            struct dirent* newEntry;
+	            newEntry = readdir (directory);
+	            if (! newEntry)
+	            {
+	            	// The entry is not valid, we done
+	                break;
+	            }
+
+	            // Get its filename
+	            DynamicString entry_name(*common_allocator(), newEntry->d_name);
+
+	            // Reject dummy entries
+	            if((entry_name=="..") || (entry_name=="."))
+	            {
+	                continue;
+	            }
+				DynamicString absolute_path(*common_allocator(), root_path);
+	            absolute_path += "/";
+	            absolute_path += entry_name;
+
+	            // Check if the entry is a directory or not
+	            bool is_file = path_is_file(absolute_path.c_str());
+
+	            if(is_file)
+	            {
+					const DynamicString& extension = path::extension(entry_name.c_str(), *common_allocator());
+	            	if( entry_name.size() < extensionSize || extension != target_extension)
+		            {
+		                continue;
+		            }
+
+		            // We found a nice fella over here
+					output_list.push_back(absolute_path);
+	            }
+	            else
+	            {
+	            	// We need to go recursive
+					collect_files_with_extension(absolute_path.c_str(), target_extension, output_list);
+	            }
+	        }
+
+	        if (closedir (directory)) 
+	        {
+				default_logger()->log(LogLevel::error, "FILE_SYSTEM", "Error while closing directory.");
+	            return;
+	        }
 		}
 	}
 

@@ -3,7 +3,17 @@ namespace bento
 {
 	template <typename T>
 	Vector<T>::Vector(IAllocator& allocator)
-	: _allocator(allocator)
+	: _allocator(&allocator)
+	, _size(0)
+	, _capacity(0)
+	, _data(nullptr)
+	{
+
+	}
+
+	template <typename T>
+	Vector<T>::Vector()
+	: _allocator(nullptr)
 	, _size(0)
 	, _capacity(0)
 	, _data(nullptr)
@@ -13,7 +23,7 @@ namespace bento
 
 	template <typename T>
 	Vector<T>::Vector(IAllocator& allocator, uint32_t size)
-	: _allocator(allocator)
+	: _allocator(&allocator)
 	, _size(0)
 	, _capacity(0)
 	, _data(nullptr)
@@ -93,7 +103,7 @@ namespace bento
 		if(_capacity)
 		{
 			clear();
-			_allocator.deallocate(_data);
+			_allocator->deallocate(_data);
 			_capacity = 0;
 		}
 	}
@@ -101,11 +111,11 @@ namespace bento
 	template <typename T>
 	void Vector<T>::reserve(uint32_t size)
 	{
-		void* ptr = _allocator.allocate(sizeof(T) * (_capacity + size), 4);
+		void* ptr = _allocator->allocate(sizeof(T) * (_capacity + size), 4);
 		memcpy(ptr, _data, sizeof(T) * _size);
 		if(_data != nullptr)
 		{
-			_allocator.deallocate(_data);
+			_allocator->deallocate(_data);
 		}
 		_data = static_cast<T*>(ptr);
 		_capacity = (_capacity + size);

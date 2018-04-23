@@ -26,6 +26,9 @@ namespace bento {
 		// Default constructor
 		Vector(IAllocator& allocator);
 
+		// Allocator without allocator
+		Vector();
+
 		// Size aware constructor
 		Vector(IAllocator& allocator, uint32_t size);
 
@@ -73,7 +76,7 @@ namespace bento {
 		inline iterator end() {return _data + _size;}
 		inline const_iterator end() const {return _data + _size;}
 	private:
-		void construct(pointer p, const Int2Type<true> &) { new (p) T(_allocator); }
+		void construct(pointer p, const Int2Type<true> &) { new (p) T(*_allocator); }
 		void construct(pointer p, const Int2Type<false> &) { new (p) T(); }
 
 	protected:
@@ -82,7 +85,7 @@ namespace bento {
 		uint32_t _capacity;
 
 	public:
-		IAllocator& _allocator;
+		IAllocator* _allocator;
 	};
 }
 

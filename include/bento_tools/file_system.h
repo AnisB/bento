@@ -16,6 +16,15 @@ namespace bento {
 		DynamicString filename(const char *file, IAllocator& allocator);
 	}
 
+	namespace file_system
+	{
+		// Define if a given path is a file
+		bool path_is_file(const char* path);
+
+		// Grab all the files with a given extension
+		void collect_files_with_extension(const char* root_path, const char* extension, Vector<DynamicString>& output_list);
+	}
+
 	// Enum that defines the access mode of a file
 	enum class FileType
 	{
