@@ -192,7 +192,7 @@ namespace bento {
 	{
 		bool success = false;
 		if (file_name != nullptr) {
-			const char * open_mode = type == FileType::Binary ? "rb" : "r";
+			const char * open_mode = "rb";
 			FILE* file_pointer = fopen(file_name, open_mode);
 			if (file_pointer != nullptr) {
 				fseek(file_pointer, 0L, SEEK_END);
@@ -202,6 +202,8 @@ namespace bento {
 				if (fread(buffer.begin(), sizeof(char), buffer_size, file_pointer) == buffer_size)
 					success = true;
 				fclose(file_pointer);
+				// If this is supposed to be read as a string, we need to add an end chracter
+				if (type == FileType::Text) buffer.push_back('\0');
 			}
 		}
 		return success;
