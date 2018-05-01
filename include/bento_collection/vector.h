@@ -27,7 +27,7 @@ namespace bento {
 		Vector(IAllocator& allocator);
 
 		// Allocator without allocator
-		Vector();
+		Vector(NoAllocator&);
 
 		// Size aware constructor
 		Vector(IAllocator& allocator, uint32_t size);

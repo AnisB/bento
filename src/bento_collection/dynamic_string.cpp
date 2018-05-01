@@ -16,7 +16,7 @@ namespace bento
 	uint32_t find_last_of(const char *str, const char s)
 	{
 		uint32_t path_size = strlen32(str);
-		uint32_t char_idx = path_size - 1;
+		int32_t char_idx = path_size - 1;
 		while( char_idx >= 0 && str[char_idx] != s)
 		{
 			--char_idx;
@@ -28,6 +28,7 @@ namespace bento
 	: _allocator(allocator)
 	, _data(allocator)
 	{
+		resize(0);
 	}
 
 	DynamicString::DynamicString(IAllocator& allocator, const char* str)
@@ -35,9 +36,10 @@ namespace bento
 	, _data(allocator)
 	{
 		uint32_t str_len = strlen32(str);
-		if(str_len) {
-			_data.resize(str_len + 1);
-			memcpy(_data.begin(), str,  str_len + 1);
+		resize(str_len);
+		if(str_len)
+		{
+			memcpy(_data.begin(), str,  str_len);
 		}
 	}
 
@@ -45,8 +47,9 @@ namespace bento
 	: _allocator(allocator)
 	, _data(allocator)
 	{
-		if(str_size) {
-			_data.resize(str_size + 1);
+		resize(str_size);
+		if(str_size)
+		{
 			_data[str_size] = 0;
 		}
 	}
@@ -66,18 +69,21 @@ namespace bento
 
 	void DynamicString::resize(uint32_t size)
 	{
-		if (size) {
+		if (size)
+		{
 			_data.resize(size + 1);
 			_data[size] = 0;
-		} else {
-			_data.resize(0);
+		}
+		else
+		{
+			_data.resize(1);
+			_data[0] = 0;
 		}
 	}
 
 	uint32_t DynamicString::size() const
 	{
-		uint32_t size = _data.size();
-		return size ? size - 1 : 0;
+		return _data.size() - 1;
 	}
 
 	DynamicString& DynamicString::operator=(const DynamicString& str)
@@ -144,14 +150,11 @@ namespace bento
 
 	void pack_type(Vector<char>& buffer, const DynamicString& str)
 	{
-		pack_bytes(buffer, str.size());
-		pack_buffer(buffer, str.size(), str.c_str());
+		pack_vector_bytes(buffer, str._data);
 	}
 
 	void unpack_type(const char*& stream, DynamicString& str)
 	{
-		uint32_t str_size;
-		unpack_bytes(stream, str_size);
-		str.resize(str_size);
+		unpack_vector_bytes(stream, str._data);
 	}
 }

@@ -34,9 +34,8 @@ namespace bento {
 		bool operator==(const char* str) const;
 		bool operator!=(const char* str) const;
 
-	private:
-		Vector<char> _data;
 	public:
+		Vector<char> _data;
 		IAllocator& _allocator;
 	};
 

@@ -10,6 +10,10 @@ namespace bento {
 	// SFNIAE based member for allocation based class
 	#define ALLOCATOR_BASED typedef int allocator_based;
 
+	struct NoAllocator
+	{
+	};
+
 	// Convert integer to type.
 	template <int v>
 	struct Int2Type 

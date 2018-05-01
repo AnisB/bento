@@ -12,7 +12,7 @@ namespace bento
 	}
 
 	template <typename T>
-	Vector<T>::Vector()
+	Vector<T>::Vector(NoAllocator&)
 	: _allocator(nullptr)
 	, _size(0)
 	, _capacity(0)
