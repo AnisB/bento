@@ -22,7 +22,7 @@ namespace bento {
 		DynamicString(IAllocator& allocator, uint32_t str_size);
 		DynamicString(const DynamicString& str);
 
-		inline char* str() { return _data.size() ? _data.begin() : ""; }
+		inline char* c_str() { return _data.size() ? _data.begin() : ""; }
 		inline const char* c_str() const { return _data.size() ? _data.begin() : ""; }
 
 		void resize(uint32_t size);
@@ -42,6 +42,9 @@ namespace bento {
 
 	namespace string
 	{
+		// Put all the characters of a string to the lower case
+		void to_lower_case(DynamicString& target_string);
+
 		// Get a substric from an original string
 		DynamicString substr(const DynamicString& source_string, uint32_t first_idx, uint32_t size);
 	}

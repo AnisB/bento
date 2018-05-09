@@ -26,7 +26,7 @@ namespace bento {
 			DynamicString result(allocator, required_size);
 
 			// Fetch the raw buffer
-			char* raw_buffer = result.str();
+			char* raw_buffer = result.c_str();
 
 			// Copy the sub_paths
 			memcpy(raw_buffer, root, root_length);
@@ -52,7 +52,7 @@ namespace bento {
 			uint32_t separator = find_last_of(file_path, EXTENSION_SEPARATOR);
 			DynamicString result(allocator, separator);
 			if(separator) {
-				memcpy(result.str(), file_path, separator);
+				memcpy(result.c_str(), file_path, separator);
 			}
 			return result;
 		}
@@ -64,7 +64,7 @@ namespace bento {
 			DynamicString result(allocator, path_size  - separator);
 			uint32_t extension_size = path_size  - separator;
 			if(extension_size) {
-				memcpy(result.str(), file_path + separator + 1, extension_size);
+				memcpy(result.c_str(), file_path + separator + 1, extension_size);
 			}
 			return result;
 		}
@@ -74,7 +74,7 @@ namespace bento {
 			uint32_t separator = find_last_of(file_path, PATH_SEPARATOR);
 			DynamicString result(allocator, separator);
 			if(separator) {
-				memcpy(result.str(), file_path, separator);
+				memcpy(result.c_str(), file_path, separator);
 			}
 			return result;
 		}
@@ -88,7 +88,7 @@ namespace bento {
 			uint32_t filename_size = extension - dir_separator - 1;
 			DynamicString result(allocator, filename_size);
 			if(filename_size){
-				memcpy(result.str(), file_path + dir_separator + 1, filename_size);
+				memcpy(result.c_str(), file_path + dir_separator + 1, filename_size);
 			}
 			return result;
 		}

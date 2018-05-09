@@ -48,7 +48,7 @@ namespace bento {
 		bool result = read_file(total_path.c_str(), raw_data, FileType::Text);
 		if (result) {
 			str.resize(raw_data.size());
-			memcpy(str.str(), raw_data.begin(), raw_data.size());
+			memcpy(str.c_str(), raw_data.begin(), raw_data.size());
 		}
 		return result;
 	}

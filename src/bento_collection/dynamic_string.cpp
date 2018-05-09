@@ -140,10 +140,20 @@ namespace bento
 
 	namespace string
 	{
+		void to_lower_case(DynamicString& target_string)
+		{
+			uint32_t num_chars = target_string.size();
+			char* character_array = target_string.c_str();
+			for(uint32_t char_idx = 0; char_idx < num_chars; ++char_idx)
+			{
+				character_array[char_idx] = tolower(character_array[char_idx]);
+			}
+		}
+
 		DynamicString substr(const DynamicString& source_string, uint32_t first_idx, uint32_t size)
 		{
 			DynamicString result_string(source_string._allocator, size);
-			memcpy(result_string.str(), source_string.c_str() + first_idx, size);
+			memcpy(result_string.c_str(), source_string.c_str() + first_idx, size);
 			return result_string;
 		}
 	}
