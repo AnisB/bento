@@ -146,7 +146,7 @@ namespace bento
 			char* character_array = target_string.c_str();
 			for(uint32_t char_idx = 0; char_idx < num_chars; ++char_idx)
 			{
-				character_array[char_idx] = tolower(character_array[char_idx]);
+				character_array[char_idx] = (char)tolower(character_array[char_idx]);
 			}
 		}
 
