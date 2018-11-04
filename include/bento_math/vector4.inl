@@ -10,6 +10,17 @@ namespace bento {
 		out.w = _w;
 		return out;
 	}
+
+	Vector4 vector4(const Vector3& vec)
+	{
+		Vector4 out;
+		out.x = vec.x;
+		out.y = vec.y;
+		out.z = vec.z;
+		out.w = 0.0f;
+		return out;
+	}
+
 	Vector4 vector4(const float _v)
 	{
 		Vector4 out;

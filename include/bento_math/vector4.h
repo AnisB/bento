@@ -7,6 +7,7 @@ namespace bento
 	// inline methods
 		// Constructors
 	inline Vector4 vector4(const float _x, const float _y, const float _z, const float _w);
+	inline Vector4 vector4(const Vector3& vec);
 	inline Vector4 vector4(const float _v);
 
 		// Operators
