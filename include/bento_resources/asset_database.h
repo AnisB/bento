@@ -12,7 +12,7 @@ namespace bento
 		TAsset(bento::IAllocator& alloc)
 		: name(alloc)
 		, path(alloc)
-		, type(-1)
+		, type(UINT32_MAX)
 		, data(alloc)
 		, id(UINT64_MAX)
 		{

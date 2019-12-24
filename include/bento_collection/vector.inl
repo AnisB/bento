@@ -111,7 +111,8 @@ namespace bento
 	template <typename T>
 	void Vector<T>::reserve(uint32_t size)
 	{
-		void* ptr = _allocator->allocate(sizeof(T) * (_capacity + size), 4);
+		size_t allocCount = (size_t)(_capacity + size);
+		void* ptr = _allocator->allocate(sizeof(T) * allocCount, 4);
 		memcpy(ptr, _data, sizeof(T) * _size);
 		if(_data != nullptr)
 		{
