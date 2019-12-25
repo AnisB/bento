@@ -138,6 +138,13 @@ namespace bento
 		return !((*this) == str);
 	}
 
+	void DynamicString::append(const char* str, uint32_t sizeP)
+	{
+		uint32_t prevSize = size();
+		resize(prevSize + sizeP);
+		memcpy(_data.begin() + prevSize, str, sizeP);
+	}
+
 	namespace string
 	{
 		void to_lower_case(DynamicString& target_string)

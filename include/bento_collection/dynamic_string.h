@@ -33,6 +33,7 @@ namespace bento {
 		DynamicString& operator+=(const DynamicString& str);
 		bool operator==(const char* str) const;
 		bool operator!=(const char* str) const;
+		void append(const char* str, uint32_t sizeP);
 
 	public:
 		Vector<char> _data;
