@@ -22,6 +22,9 @@ namespace bento {
 
 		// The virtual logging function that must be 
 		virtual void log(LogLevel::Type log_level, const char* tag, const char* message) = 0;
+
+		// Insert empty new line
+		virtual void new_line() = 0;
 	};
 
 	// default logger manipulation

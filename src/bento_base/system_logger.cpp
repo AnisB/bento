@@ -30,4 +30,9 @@ namespace bento {
 	void SystemLogger::log(LogLevel::Type log_level, const char* tag, const char* message) {
 		std::cout<< level_to_string(log_level) << "[" << tag << "]" << message << "\n";
 	}
+
+	void SystemLogger::new_line()
+	{
+		std::cout << "\n";
+	}
 }
