@@ -22,7 +22,7 @@ namespace bento {
 		DynamicString(IAllocator& allocator, uint32_t str_size);
 		DynamicString(const DynamicString& str);
 
-		inline char* c_str() { return _data.size() ? _data.begin() : ""; }
+		inline char* c_str() { return _data.size() ? _data.begin() : nullptr; }
 		inline const char* c_str() const { return _data.size() ? _data.begin() : ""; }
 
 		void resize(uint32_t size);
