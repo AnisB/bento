@@ -8,6 +8,7 @@
 	#include <ctype.h>
 	#include <stdlib.h>
 	#include <malloc.h>
+	#include <stddef.h>
 
 	// Defines
 	#define FUNCTION_NAME __PRETTY_FUNCTION__
