@@ -1,6 +1,6 @@
 // Library includes
-#include "bento_memory/system_allocator.h"
 #include "bento_base/platform.h"
+#include "bento_memory/system_allocator.h"
 
 // External includes
 #include <algorithm>
@@ -47,7 +47,7 @@ namespace bento {
 		#if defined (WINDOWSPC)
 			_aligned_free(_ptr);
 		#elif defined(LINUXPC)
-			free(ptr);
+			free(_ptr);
 		#else
 			#error Unsupported platfrom
 		#endif
