@@ -1,5 +1,7 @@
 #pragma once
 
+#include "bento_base/platform.h"
+
 namespace bento
 {
 	class IAllocator
