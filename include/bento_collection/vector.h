@@ -6,6 +6,7 @@
 
 // External includes
 #include <type_traits>
+#include <string.h>
 
 namespace bento {
 	
