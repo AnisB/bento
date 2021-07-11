@@ -1,10 +1,6 @@
 // SDK includes
 #include "bento_base/log.h"
 #include "bento_tools/file_system.h"
-#pragma warning(push)
-#pragma warning(disable: 4505)
-#include "bento_base/dirent.h"
-#pragma warning(pop)
 
 
 // External includes

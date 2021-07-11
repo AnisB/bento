@@ -10,6 +10,8 @@
 	#include <malloc.h>
 	#include <stddef.h>
 	#include <string.h>
+	#include <dirent.h>
+	#include <sys/stat.h>
 
 	// Defines
 	#define FUNCTION_NAME __PRETTY_FUNCTION__
@@ -18,6 +20,10 @@
 
 #elif defined(WINDOWSPC)
 	// Includes
+	#pragma warning(push)
+	#pragma warning(disable: 4505)
+	#include "bento_base/dirent.h"
+	#pragma warning(pop)
 	#include <stdint.h>
 	#include <windows.h>
 	#define SLEEP_FUNCTION(time) Sleep(time)
