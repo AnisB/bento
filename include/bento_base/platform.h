@@ -18,6 +18,13 @@
 	#define EXCEPTION_STACK_SIZE 20
 	#define SLEEP_FUNCTION(time) sleep(time)
 
+	typedef int errno_t;
+	inline errno_t fopen_s(FILE **f, const char *name, const char *mode)
+	{
+	    *f = fopen(name, mode);
+	    return 0;
+	}
+
 #elif defined(WINDOWSPC)
 	// Includes
 	#pragma warning(push)
