@@ -18,6 +18,8 @@ namespace bento {
 	{
 		#if defined (WINDOWSPC)
 			return _aligned_malloc(size, alignment);
+		#elif defined(LINUXPC)
+			return memalign(alignment, size);
 		#else
 			#error Unsupported platfrom
 		#endif
@@ -30,6 +32,11 @@ namespace bento {
 			memcpy(ptr, old_ptr, old_size > new_size ? new_size : old_size);
 			deallocate(old_ptr);
 			return ptr;
+		#elif defined(LINUXPC)
+			void* ptr = allocate(new_size, alignment);
+			memcpy(ptr, old_ptr, old_size > new_size ? new_size : old_size);
+			deallocate(old_ptr);
+			return ptr;
 		#else
 			#error Unsupported platfrom
 		#endif
@@ -37,6 +44,12 @@ namespace bento {
 
 	void SystemAllocator::deallocate(void* _ptr)
 	{
-		_aligned_free(_ptr);
+		#if defined (WINDOWSPC)
+			_aligned_free(_ptr);
+		#elif defined(LINUXPC)
+			free(ptr);
+		#else
+			#error Unsupported platfrom
+		#endif
 	}
 }
