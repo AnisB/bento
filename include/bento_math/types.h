@@ -3,6 +3,9 @@
 // Library includes
 #include "bento_base/platform.h"
 
+// External includes
+#include <math.h>
+
 namespace bento {
 	struct Vector2
 	{
