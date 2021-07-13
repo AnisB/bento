@@ -16,7 +16,7 @@
 	// Defines
 	#define FUNCTION_NAME __PRETTY_FUNCTION__
 	#define EXCEPTION_STACK_SIZE 20
-	#define SLEEP_FUNCTION(time) sleep(time)
+	#define SLEEP_FUNCTION(time) sleep(time * 0.001)
 
 	typedef int errno_t;
 	inline errno_t fopen_s(FILE **f, const char *name, const char *mode)
