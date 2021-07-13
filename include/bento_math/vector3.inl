@@ -84,4 +84,13 @@ namespace bento
 	{
 		return _index == 0 ? _val.x : (_index == 1 ? _val.y : _val.z);
 	}
+
+	Vector3 lerp(const Vector3& v0, const Vector3& v1, const Vector3& l)
+	{
+		Vector3 out;
+		out.x = (1.0 - l.x) * v0.x + v1.x * l.x;
+		out.y = (1.0 - l.y) * v0.y + v1.y * l.y;
+		out.z = (1.0 - l.z) * v0.z + v1.z * l.z;
+		return out;
+	}
 }

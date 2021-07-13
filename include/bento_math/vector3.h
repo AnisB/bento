@@ -27,6 +27,7 @@ namespace bento
 	inline float len(const Vector3& _v1);
 	inline float len_squared(const Vector3& _v1);
 	inline Vector3 normalize(const Vector3& _v1);
+	inline Vector3 lerp(const Vector3& v0, const Vector3& v1, const Vector3& l);
 
 	// Default values;
 	extern const Vector3 v3_ZERO;
