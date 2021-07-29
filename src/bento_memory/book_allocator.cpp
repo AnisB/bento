@@ -17,6 +17,8 @@ namespace bento {
 
     BookAllocator::BookAllocator()
     : _pages(*common_allocator())
+    , _minChunkSize(0)
+    , _maxChunkSize(0)
     {
     }
 
@@ -27,6 +29,9 @@ namespace bento {
     // Allocate a memory chunk give a particular alignment
     void* BookAllocator::allocate(size_t size, size_t alignment)
     {
+        // Compute the total allocationsize
+        uint32_t totalAllocationSize = 4 + size;
+
         // Loop through all the pages
         uint32_t numPages = _pages.size();
         for(uint32_t pageIdx = 0; pageIdx < numPages; ++pageIdx)
@@ -35,10 +40,10 @@ namespace bento {
             PageAllocator& currentPage = _pages[pageIdx];
 
             // Would this allocation fit inside the page? 
-            if (currentPage.chunk_size() <= size && !currentPage.is_full())
+            if (currentPage.chunk_size() >= totalAllocationSize && !currentPage.is_full())
             {
                 // We allocate 4 additional bytes for us to store the book allocator's information
-                uint32_t* data = (uint32_t*)currentPage.allocate(4 + size, alignment);
+                uint32_t* data = (uint32_t*)currentPage.allocate(totalAllocationSize, alignment);
                 
                 // We store out additional information (page idx for now)
                 data[0] = pageIdx;
@@ -93,14 +98,14 @@ namespace bento {
         assert(_maxChunkSize > _minChunkSize && _maxChunkSize % 4 == 0);
 
         // Define the number of pages we'll need
-        uint32_t numPages = (_maxChunkSize - _minChunkSize) / 4 + 1;
+        uint32_t numPages = (uint32_t)((_maxChunkSize - _minChunkSize) / 4 + 1);
         _pages.resize(numPages);
 
         for (uint32_t pageIdx = 0; pageIdx < numPages; ++pageIdx)
         {
             // Get the current page
             PageAllocator& currentPage = _pages[pageIdx];
-            currentPage.initialize(_minChunkSize + 4 * pageIdx);
+            currentPage.initialize(_minChunkSize + (uint32_t)4 * pageIdx + 4);
         }
     }
 
@@ -112,5 +117,10 @@ namespace bento {
     size_t BookAllocator::max_chunk_size()
     {
         return _minChunkSize;
+    }
+
+    PageAllocator& BookAllocator::get_page_allocator(uint32_t page_index)
+    {
+        return _pages[page_index];
     }
 }

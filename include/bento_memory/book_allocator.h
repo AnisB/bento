@@ -22,6 +22,7 @@ namespace bento {
         void initialize(uint64_t min_chunk_size, uint64_t max_chunk_size);
         size_t min_chunk_size();
         size_t max_chunk_size();
+        PageAllocator& get_page_allocator(uint32_t page_index);
 
     protected:
         Vector<PageAllocator> _pages;
