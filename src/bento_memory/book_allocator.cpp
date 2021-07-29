@@ -30,7 +30,7 @@ namespace bento {
     void* BookAllocator::allocate(size_t size, size_t alignment)
     {
         // Compute the total allocationsize
-        uint32_t totalAllocationSize = 4 + size;
+        uint32_t totalAllocationSize = (uint32_t)(4 + size);
 
         // Loop through all the pages
         uint32_t numPages = _pages.size();

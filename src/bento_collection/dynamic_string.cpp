@@ -7,23 +7,6 @@
 
 namespace bento
 {
-	uint32_t strlen32(const char* str)
-	{
-		return (uint32_t)strlen(str);
-	}
-
-	// Find the last occurent of a character
-	uint32_t find_last_of(const char *str, const char s)
-	{
-		uint32_t path_size = strlen32(str);
-		int32_t char_idx = path_size - 1;
-		while( char_idx >= 0 && str[char_idx] != s)
-		{
-			--char_idx;
-		}
-		return char_idx != UINT32_MAX ? char_idx : path_size;
-	}
-
 	DynamicString::DynamicString(IAllocator& allocator)
 	: _allocator(allocator)
 	, _data(allocator)
@@ -35,7 +18,7 @@ namespace bento
 	: _allocator(allocator)
 	, _data(allocator)
 	{
-		uint32_t str_len = strlen32(str);
+		uint32_t str_len = string::strlen32(str);
 		resize(str_len);
 		if(str_len)
 		{
@@ -102,7 +85,7 @@ namespace bento
 	DynamicString& DynamicString::operator=(const char* str)
 	{
 		// Set them to be the same size
-		uint32_t str_size = strlen32(str);
+		uint32_t str_size = string::strlen32(str);
 		resize(str_size);
 
 		// memcpy the buffer
@@ -115,7 +98,7 @@ namespace bento
 	DynamicString& DynamicString::operator+=(const char* str)
 	{
 		uint32_t current_size = size();
-		uint32_t str_size = strlen32(str);
+		uint32_t str_size = string::strlen32(str);
 		uint32_t new_size = current_size + str_size;
 		resize(new_size);
 		memcpy(_data.begin() + current_size, str, str_size);
@@ -147,6 +130,23 @@ namespace bento
 
 	namespace string
 	{
+		uint32_t strlen32(const char* str)
+		{
+			return (uint32_t)strlen(str);
+		}
+
+		// Find the last occurent of a character
+		uint32_t find_last_of(const char* str, const char s)
+		{
+			uint32_t path_size = strlen32(str);
+			int32_t char_idx = path_size - 1;
+			while (char_idx >= 0 && str[char_idx] != s)
+			{
+				--char_idx;
+			}
+			return char_idx != UINT32_MAX ? char_idx : path_size;
+		}
+
 		void to_lower_case(DynamicString& target_string)
 		{
 			uint32_t num_chars = target_string.size();
@@ -192,7 +192,7 @@ namespace bento
 			}
 		}
 
-		void replace_substring(DynamicString& source_string, const char* to_replace, const char* replacement)
+		void replace_substring(const DynamicString& source_string, const char* to_replace, const char* replacement, DynamicString& output_string)
 		{
 			// First we need to count the number of occurences of "to_replace" to know what is the the new length of the string
 			uint32_t sourceLength = strlen32(to_replace);
@@ -201,7 +201,7 @@ namespace bento
 
 			// Find all the occurences of the target to_replace string
 			uint32_t stringSize = source_string.size();
-			Vector<uint32_t> occurences(source_string._allocator);
+			Vector<uint32_t> occurences(*common_allocator());
 			find_all_occurences(source_string.c_str(), stringSize, to_replace, sourceLength, occurences);
 
 			// If no occurences we found we have nothingto do
@@ -212,23 +212,27 @@ namespace bento
 			// Define the new size of the string
 			uint32_t targetLength = strlen32(replacement);
 			uint32_t newStringSize = stringSize - sourceLength * numOccurences + targetLength * numOccurences;
-			bool replacementIsBigger = newStringSize > stringSize;
-			// If the string is bigger than it was, we allocate the space
-			if (replacementIsBigger)
-				source_string.resize(newStringSize);
+			output_string.resize(newStringSize);
 
 			// Actually replace the data
+			uint32_t inputCharIdx = 0;
+			uint32_t outputCharIdx = 0;
 			for (uint32_t occIdx = 0; occIdx < numOccurences; ++occIdx)
 			{
-				if (occIdx != 0)
-				{
-
-				}
+				// First we need to copy what is before the occurence
+				uint32_t occurenceLocation = occurences[occIdx];
+				uint32_t sizeSinceLastOccurence = occurenceLocation - inputCharIdx;
+				memcpy(output_string.c_str() + outputCharIdx, source_string.c_str() + inputCharIdx, sizeSinceLastOccurence);
+				memcpy(output_string.c_str() + outputCharIdx + sizeSinceLastOccurence, replacement, targetLength);
+				inputCharIdx = occurenceLocation + sourceLength;
+				outputCharIdx += sizeSinceLastOccurence + targetLength;
 			}
 
-			// Now that we are done, resize to the right size
-			if (!replacementIsBigger)
-				source_string.resize(newStringSize);
+			if (inputCharIdx < stringSize - 1)
+			{
+				uint32_t remainingSize = stringSize - inputCharIdx;
+				memcpy(output_string.c_str() + outputCharIdx, source_string.c_str() + inputCharIdx, remainingSize);
+			}
 		}
 	}
 
