@@ -163,6 +163,73 @@ namespace bento
 			memcpy(result_string.c_str(), source_string.c_str() + first_idx, size);
 			return result_string;
 		}
+
+		void find_all_occurences(const char* source_str, uint32_t source_str_size, const char* to_find, uint32_t to_find_size, Vector<uint32_t>& results)
+		{
+			uint32_t charIdx = 0;
+			while (charIdx < source_str_size)
+			{
+				// If there is not enough characters so that we can find the target string, we are done
+				if ((source_str_size - charIdx) < to_find_size)
+					break;
+
+				bool found = false;
+				for (uint32_t toFindCharIdx = 0; toFindCharIdx < to_find_size; ++toFindCharIdx)
+				{
+					// If any char of the substr is not fullfilled, we are done
+					if (source_str[charIdx + toFindCharIdx] != to_find[toFindCharIdx])
+						break;
+
+					// We were able to find an occurence
+					if (toFindCharIdx == (to_find_size - 1))
+					{
+						results.push_back(charIdx);
+						found = true;
+					}
+				}
+
+				charIdx += found ? to_find_size : 1;
+			}
+		}
+
+		void replace_substring(DynamicString& source_string, const char* to_replace, const char* replacement)
+		{
+			// First we need to count the number of occurences of "to_replace" to know what is the the new length of the string
+			uint32_t sourceLength = strlen32(to_replace);
+			if (sourceLength == 0)
+				return;
+
+			// Find all the occurences of the target to_replace string
+			uint32_t stringSize = source_string.size();
+			Vector<uint32_t> occurences(source_string._allocator);
+			find_all_occurences(source_string.c_str(), stringSize, to_replace, sourceLength, occurences);
+
+			// If no occurences we found we have nothingto do
+			uint32_t numOccurences = occurences.size();
+			if (numOccurences == 0)
+				return;
+
+			// Define the new size of the string
+			uint32_t targetLength = strlen32(replacement);
+			uint32_t newStringSize = stringSize - sourceLength * numOccurences + targetLength * numOccurences;
+			bool replacementIsBigger = newStringSize > stringSize;
+			// If the string is bigger than it was, we allocate the space
+			if (replacementIsBigger)
+				source_string.resize(newStringSize);
+
+			// Actually replace the data
+			for (uint32_t occIdx = 0; occIdx < numOccurences; ++occIdx)
+			{
+				if (occIdx != 0)
+				{
+
+				}
+			}
+
+			// Now that we are done, resize to the right size
+			if (!replacementIsBigger)
+				source_string.resize(newStringSize);
+		}
 	}
 
 	void pack_type(Vector<char>& buffer, const DynamicString& str)

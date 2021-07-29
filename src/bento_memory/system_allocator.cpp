@@ -16,40 +16,24 @@ namespace bento {
 	// Allocate a memory chunk give a particular alignment
 	void* SystemAllocator::allocate(size_t size, size_t alignment)
 	{
-		#if defined (WINDOWSPC)
-			return _aligned_malloc(size, alignment);
-		#elif defined(LINUXPC)
-			return memalign(alignment, size);
-		#else
-			#error Unsupported platfrom
-		#endif
+		return platform_allocate(size, alignment);
 	}
 
 	void* SystemAllocator::reallocate(void* old_ptr, size_t old_size, size_t new_size, size_t alignment)
 	{
-		#if defined (WINDOWSPC)
-			void* ptr = allocate(new_size, alignment);
-			memcpy(ptr, old_ptr, old_size > new_size ? new_size : old_size);
-			deallocate(old_ptr);
-			return ptr;
-		#elif defined(LINUXPC)
-			void* ptr = allocate(new_size, alignment);
-			memcpy(ptr, old_ptr, old_size > new_size ? new_size : old_size);
-			deallocate(old_ptr);
-			return ptr;
-		#else
-			#error Unsupported platfrom
-		#endif
+		void* ptr = allocate(new_size, alignment);
+		memcpy(ptr, old_ptr, old_size > new_size ? new_size : old_size);
+		deallocate(old_ptr);
+		return ptr;
 	}
 
-	void SystemAllocator::deallocate(void* _ptr)
+	void SystemAllocator::deallocate(void* ptr)
 	{
-		#if defined (WINDOWSPC)
-			_aligned_free(_ptr);
-		#elif defined(LINUXPC)
-			free(_ptr);
-		#else
-			#error Unsupported platfrom
-		#endif
+		platform_free(ptr);
+	}
+
+	bool SystemAllocator::is_multi_thread_safe()
+	{
+		return true;
 	}
 }

@@ -48,6 +48,12 @@ namespace bento {
 
 		// Get a substric from an original string
 		DynamicString substr(const DynamicString& source_string, uint32_t first_idx, uint32_t size);
+
+		// Find all occurences of a given string into a bigger tring
+		void find_all_occurences(const char* source_str, uint32_t source_str_size, const char* to_find, uint32_t to_find_size, Vector<uint32_t>& results);
+
+		// Replaces all occurences of a given string by an other substring
+		void replace_substring(DynamicString& source_string, const char* to_replace, const char* replacement);
 	}
 
 	void pack_type(Vector<char>& buffer, const DynamicString& str);

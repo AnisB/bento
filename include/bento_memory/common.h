@@ -48,21 +48,21 @@ namespace bento {
 	inline T* make_new(IAllocator& allocator)
 	{
 		void* ptr = allocator.allocate(sizeof(T), 4);
-		return new (ptr) T();
+		return ptr != nullptr ? new (ptr) T() : nullptr;
 	}
 
 	template<typename T, typename P1>
 	inline T* make_new(IAllocator& allocator, P1& p1)
 	{
 		void* ptr = allocator.allocate(sizeof(T), 4);
-		return new (ptr) T(p1);
+		return ptr != nullptr ? new (ptr) T(p1) : nullptr;
 	}	
 
 	template<typename T, typename P1, typename P2>
 	inline T* make_new(IAllocator& allocator, P1& p1, P2& p2)
 	{
 		void* ptr = allocator.allocate(sizeof(T), 4);
-		return new (ptr) T(p1, p2);
+		return  ptr != nullptr ? new (ptr) T(p1, p2) : nullptr;
 	}	
 
 	template<typename T>
