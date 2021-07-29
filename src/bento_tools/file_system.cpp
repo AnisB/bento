@@ -18,8 +18,8 @@ namespace bento {
 		inline DynamicString internal_join(const char* root, const char* sub_path, const char separator, IAllocator& allocator)
 		{	
 			// Compute the path lengths
-			uint32_t root_length = strlen32(root);
-			uint32_t subpath_length = strlen32(sub_path);
+			uint32_t root_length = string::strlen32(root);
+			uint32_t subpath_length = string::strlen32(sub_path);
 			uint32_t required_size = root_length + 1 + subpath_length;
 
 			// Create the output container
@@ -49,7 +49,7 @@ namespace bento {
 
 		DynamicString strip_extension(const char *file_path, IAllocator& allocator)
 		{
-			uint32_t separator = find_last_of(file_path, EXTENSION_SEPARATOR);
+			uint32_t separator = string::find_last_of(file_path, EXTENSION_SEPARATOR);
 			DynamicString result(allocator, separator);
 			if(separator) {
 				memcpy(result.c_str(), file_path, separator);
@@ -59,8 +59,8 @@ namespace bento {
 
 		DynamicString extension(const char *file_path, IAllocator& allocator)
 		{
-			uint32_t path_size = strlen32(file_path);
-			uint32_t separator = find_last_of(file_path, EXTENSION_SEPARATOR);
+			uint32_t path_size = string::strlen32(file_path);
+			uint32_t separator = string::find_last_of(file_path, EXTENSION_SEPARATOR);
 			DynamicString result(allocator, path_size  - separator);
 			uint32_t extension_size = path_size  - separator;
 			if(extension_size) {
@@ -71,7 +71,7 @@ namespace bento {
 
 		DynamicString directory(const char *file_path, IAllocator& allocator)
 		{
-			uint32_t separator = find_last_of(file_path, PATH_SEPARATOR);
+			uint32_t separator = string::find_last_of(file_path, PATH_SEPARATOR);
 			DynamicString result(allocator, separator);
 			if(separator) {
 				memcpy(result.c_str(), file_path, separator);
@@ -81,10 +81,10 @@ namespace bento {
 
 		DynamicString filename(const char *file_path, IAllocator& allocator)
 		{
-			uint32_t path_size = strlen32(file_path);
-			uint32_t dir_separator = find_last_of(file_path, PATH_SEPARATOR);
+			uint32_t path_size = string::strlen32(file_path);
+			uint32_t dir_separator = string::find_last_of(file_path, PATH_SEPARATOR);
 			dir_separator = dir_separator != path_size ? dir_separator : 0;
-			uint32_t extension = find_last_of(file_path, EXTENSION_SEPARATOR);
+			uint32_t extension = string::find_last_of(file_path, EXTENSION_SEPARATOR);
 			uint32_t filename_size = extension - dir_separator - 1;
 			DynamicString result(allocator, filename_size);
 			if(filename_size){

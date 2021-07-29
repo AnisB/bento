@@ -30,7 +30,7 @@ namespace bento {
     }
 
     // Allocate a memory chunk give a particular alignment
-    void* PageAllocator::allocate(size_t size, size_t alignment)
+    void* PageAllocator::allocate(size_t size, size_t)
     {
         if (size > _chunkSize|| UINT64_MAX == _usageFlags)
             return nullptr;
@@ -46,9 +46,10 @@ namespace bento {
         		return (void*)(memoryAsUint8 + _chunkSize * chunkIdx);
         	}
         }
+        return nullptr;
     }
 
-    void* PageAllocator::reallocate(void* old_ptr, size_t old_size, size_t new_size, size_t alignment)
+    void* PageAllocator::reallocate(void* old_ptr, size_t, size_t new_size, size_t)
     {
         // If the required size is inferior to the chunk size, we can keep the same pointer
         if (new_size < _chunkSize)

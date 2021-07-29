@@ -55,7 +55,7 @@ namespace bento {
         return nullptr;
     }
 
-    void* BookAllocator::reallocate(void* old_ptr, size_t old_size, size_t new_size, size_t alignment)
+    void* BookAllocator::reallocate(void* old_ptr, size_t, size_t new_size, size_t)
     {
         // Grab the page index
         uint32_t pageIdx = get_pointer_header(old_ptr);
@@ -65,7 +65,7 @@ namespace bento {
             return old_ptr;
 
         // Try to allocate a new pointer as the previous one cannot be used
-        void* newPtr = allocate(new_size, alignment);
+        void* newPtr = allocate(new_size, 4);
         if (newPtr != nullptr)
         {
             deallocate(old_ptr);
