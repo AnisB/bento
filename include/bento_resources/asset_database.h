@@ -42,7 +42,7 @@ namespace bento
 		bool unpack_asset_to_type(const char* name, T& outputType) const
 		{
 			// Hash and call the right model
-			uint64_t id = bento::murmur_hash_64(name, strlen32(name), 0);
+			uint64_t id = bento::murmur_hash_64(name, string::strlen32(name), 0);
 			return unpack_asset_to_type(id, outputType);
 		}
 
