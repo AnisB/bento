@@ -75,6 +75,11 @@ namespace bento {
         return false;
     }
 
+    uint32_t PageAllocator::header_size()
+    {
+        return 0;
+    }
+
     size_t PageAllocator::chunk_size()
     {
         return _chunkSize;
@@ -89,4 +94,10 @@ namespace bento {
     {
         return _usageFlags == UINT64_MAX;
     }
+
+    uint64_t PageAllocator::memory_footprint()
+    {
+        return (_chunkSize * CHUNKS_PER_PAGE);
+    }
+
 }

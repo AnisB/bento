@@ -17,16 +17,22 @@ namespace bento {
         void* reallocate(void* old_ptr, size_t old_size, size_t new_size, size_t alignment) override;
         void deallocate(void* ptr) override;
         bool is_multi_thread_safe() override;
+        uint32_t header_size() override;
 
         // Allocator specific methods
-        void initialize(uint64_t min_chunk_size, uint64_t max_chunk_size);
         size_t min_chunk_size();
         size_t max_chunk_size();
+        uint64_t memory_footprint();
         PageAllocator& get_page_allocator(uint32_t page_index);
+        void set_num_pages(uint32_t num_pages);
+        uint32_t num_pages();
 
     protected:
         Vector<PageAllocator> _pages;
-        size_t _maxChunkSize;
-        size_t _minChunkSize;
     };
+
+    namespace book_allocator
+    {
+        void initialize(BookAllocator& allocator, uint64_t min_chunk_size, uint64_t max_chunk_size);
+    }
 }

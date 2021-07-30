@@ -36,4 +36,9 @@ namespace bento {
 	{
 		return true;
 	}
+
+	uint32_t SystemAllocator::header_size()
+	{
+		return 0;
+	}
 }
