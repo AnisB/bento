@@ -104,6 +104,7 @@ namespace bento
 		{
 			clear();
 			_allocator->deallocate(_data);
+			_data = nullptr;
 			_capacity = 0;
 		}
 	}

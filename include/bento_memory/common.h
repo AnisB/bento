@@ -71,5 +71,32 @@ namespace bento {
 		allocator.deallocate(target_ptr);
 	}
 
+	template<typename THeader>
+	THeader& header_from_pointer(void* ptr)
+	{
+		THeader* headerPtr = (THeader*)ptr;
+		return *(headerPtr);
+	}
+
+	template<typename THeader>
+	void* memory_from_pointer(void* ptr)
+	{
+		return (void*)((uint8_t*)ptr + sizeof(THeader));
+	}
+
+	template<typename THeader>
+	const THeader& header_from_memory(void* ptr)
+	{
+		THeader* headerPtr = (THeader*)ptr;
+		return *(headerPtr - 1);
+	}
+
+	template<typename THeader>
+	void* pointer_from_memory(void* ptr)
+	{
+		THeader* headerPtr = (THeader*)ptr;
+		return (headerPtr - 1);
+	}
+
 	IAllocator* common_allocator();
 }

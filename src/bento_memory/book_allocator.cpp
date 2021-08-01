@@ -13,14 +13,6 @@ namespace bento {
         uint32_t pageIdx;
     };
 
-    // This is unsafe and relies on the fact that the pointer 
-    // was actually allocated by this exact of allocator to work
-    const BookAllocatorHeader& get_pointer_header(void* ptr)
-    {
-        BookAllocatorHeader* headerPtr = (BookAllocatorHeader*)ptr;
-        return *(headerPtr - 1);
-    }
-
     BookAllocator::BookAllocator()
     : _pages(*common_allocator())
     {
@@ -46,14 +38,17 @@ namespace bento {
             // Would this allocation fit inside the page? 
             if (currentPage.chunk_size() >= totalAllocationSize && !currentPage.is_full())
             {
+				// Allocate the required memory
+				void* rawPtr = currentPage.allocate(totalAllocationSize, alignment);
+
                 // We allocate 4 additional bytes for us to store the book allocator's information
-                BookAllocatorHeader* headerPointer = (BookAllocatorHeader*)currentPage.allocate(totalAllocationSize, alignment);
+				BookAllocatorHeader& headerPointer = header_from_pointer<BookAllocatorHeader>(rawPtr);
                 
                 // We store out additional information (page idx for now)
-                headerPointer[0].pageIdx = pageIdx;
+                headerPointer.pageIdx = pageIdx;
 
                 // Return the pointer (shifted by the header)
-                return (void*)(headerPointer + 1);
+                return memory_from_pointer<BookAllocatorHeader>(rawPtr);
             }
         }
         return nullptr;
@@ -62,7 +57,7 @@ namespace bento {
     void* BookAllocator::reallocate(void* old_ptr, size_t, size_t new_size, size_t)
     {
         // Grab the page index
-        const BookAllocatorHeader& pointerHeader = get_pointer_header(old_ptr);
+        const BookAllocatorHeader& pointerHeader = header_from_memory<BookAllocatorHeader>(old_ptr);
         PageAllocator& originPage = _pages[pointerHeader.pageIdx];
         // If the required size is inferior to the previously allocated size, we can keep the same pointer
         if (new_size < originPage.chunk_size())
@@ -83,8 +78,8 @@ namespace bento {
     void BookAllocator::deallocate(void* ptr)
     {
         // Grab the page index
-        const BookAllocatorHeader& header = get_pointer_header(ptr);
-        _pages[header.pageIdx].deallocate(ptr);
+		const BookAllocatorHeader& header = header_from_memory<BookAllocatorHeader>(ptr);
+		_pages[header.pageIdx].deallocate(ptr);
     }
 
     bool BookAllocator::is_multi_thread_safe()
