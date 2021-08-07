@@ -5,6 +5,9 @@ set(BENTO_SDK_INCLUDE ${BENTO_SDK_ROOT}/include)
 set(BENTO_SDK_SOURCE ${BENTO_SDK_ROOT}/src)
 
 sub_directory_list(sub_projects_headers "${BENTO_SDK_INCLUDE}")
+if (OpenCL_FOUND)
+	set(BENTO_SDK_INCLUDE "${BENTO_SDK_INCLUDE};${OpenCL_INCLUDE_DIRS}")
+endif()
 
 foreach(header_dir ${sub_projects_headers})
 	bento_headers(tmp_header_list "${BENTO_SDK_INCLUDE}/${header_dir}" "${header_dir}")
