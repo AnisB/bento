@@ -6,17 +6,17 @@
 #if defined(VULKAN_SUPPORTED) && defined(GLFW_SUPPORTED)
 namespace bento
 {
+	// Types definition
+	typedef uint64_t RenderEnvironment;
+	typedef uint64_t RenderWindow;
+	typedef uint64_t GeometryObject;
+	typedef uint64_t FramebufferObject;
+	typedef uint64_t TextureObject;
+	typedef uint64_t CubemapObject;
+	typedef uint64_t ShaderPipelineObject;
+
 	namespace vulkan
 	{
-		// Types definition
-		typedef uint64_t RenderEnvironment;
-		typedef uint64_t RenderWindow;
-		typedef uint64_t GeometryObject;
-		typedef uint64_t FramebufferObject;
-		typedef uint64_t TextureObject;
-		typedef uint64_t CubemapObject;
-		typedef uint64_t ShaderPipelineObject;
-
 		namespace render_system
 		{
 			bool init_render_system();

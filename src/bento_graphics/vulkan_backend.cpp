@@ -24,26 +24,32 @@ namespace bento
 {
 	namespace vulkan
 	{
-		struct TQueueIndexes
-		{
-			TQueueIndexes()
-			: graphics_queue(UINT32_MAX)
-			, present_queue(UINT32_MAX)
-			{
-
-			}
-			uint32_t graphics_queue;
-			uint32_t present_queue;
-		};
-
 		struct VKRenderEnvironment
 		{
+			// Platform speicifc window
 			GLFWwindow* window;
+
+			// Vulkan instance
 			VkInstance instance;
+
+			// Physical device (GPU)
 			VkPhysicalDevice physical_device;
+
+			// Logical device to interact with the physical device
 			VkDevice logical_device;
+
+			// Surface where vulkan renders
 			VkSurfaceKHR surface;
-			TQueueIndexes queue_indexes;
+
+			// Rendering queue data
+			uint32_t renderingQueueIdx;
+			VkQueue renderingQueue;
+
+			// Preset queue data
+			uint32_t presentQueueIdx;
+			VkQueue presentQueue;
+
+			// Allocator used for the structure
 			bento::IAllocator* _allocator;
 		};
 
@@ -79,31 +85,35 @@ namespace bento
 				return UINT32_MAX;
 			}
 
-			void find_graphics_queue(VkQueueFamilyProperties* queue_array, uint64_t num_queues, TQueueIndexes& output_queues)
+			uint32_t find_rendering_queue(VkQueueFamilyProperties* queue_array, uint64_t num_queues)
 			{
-				// Check for the queues
-				TQueueIndexes queue_data;
+				// Iterate through the queues
 				for (uint32_t queue_idx = 0; queue_idx < num_queues; ++queue_idx)
 				{
-					VkQueueFamilyProperties& current_queue = queue_array[queue_idx];
-					if (current_queue.queueCount > 0 && current_queue.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-					{
-						output_queues.graphics_queue = queue_idx;
-						return;
-					}
+					// Get the current properties
+					const VkQueueFamilyProperties& queueProperties = queue_array[queue_idx];
+					if (queueProperties.queueCount == 0)
+						continue;
+
+					// Find a queue that has all the requirements
+					if ((queueProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+						&& (queueProperties.queueFlags & VK_QUEUE_COMPUTE_BIT)
+						&& (queueProperties.queueFlags & VK_QUEUE_TRANSFER_BIT))
+						return queue_idx;
 				}
+				return UINT32_MAX;
 			}
 
 			void find_present_queue(VKRenderEnvironment* vk_re, uint32_t num_queues)
 			{
-				// Check for the queues
+				// Loop through the quques
 				for (uint32_t queue_idx = 0; queue_idx < num_queues; ++queue_idx)
 				{
+					// 
 					VkBool32 present_support;
-					vkGetPhysicalDeviceSurfaceSupportKHR(vk_re->physical_device, queue_idx, vk_re->surface, &present_support);
-					if (present_support)
+					if (vkGetPhysicalDeviceSurfaceSupportKHR(vk_re->physical_device, queue_idx, vk_re->surface, &present_support) == VK_SUCCESS && present_support)
 					{
-						vk_re->queue_indexes.present_queue = queue_idx;
+						vk_re->presentQueueIdx = queue_idx;
 						return;
 					}
 				}
@@ -168,24 +178,28 @@ namespace bento
 				// Keep track of the "best" physical device 
 				vk_re->physical_device = devices[(uint32_t)best_device];
 
+				// Get the number of queue famiies
 				uint32_t queueFamilyCount = 0;
 				vkGetPhysicalDeviceQueueFamilyProperties(vk_re->physical_device, &queueFamilyCount, nullptr);
 
+				// List the queue family properties
 				bento::Vector<VkQueueFamilyProperties> queueFamilies(allocator, queueFamilyCount);
 				vkGetPhysicalDeviceQueueFamilyProperties(vk_re->physical_device, &queueFamilyCount, queueFamilies.begin());
 
 				// Check for the queues
-				find_graphics_queue(queueFamilies.begin(), queueFamilyCount, vk_re->queue_indexes);
-				assert_msg(vk_re->queue_indexes.graphics_queue != -1, "No valid graphics queue found");
+				vk_re->renderingQueueIdx = find_rendering_queue(queueFamilies.begin(), queueFamilyCount);
+				assert_msg(vk_re->renderingQueueIdx != UINT32_MAX, "No valid rendering queue found");
+
 
 				// Queue creation descriptor
 				VkDeviceQueueCreateInfo queue_create_info = {};
 				queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-				queue_create_info.queueFamilyIndex = vk_re->queue_indexes.graphics_queue;
+				queue_create_info.queueFamilyIndex = vk_re->renderingQueueIdx;
 				queue_create_info.queueCount = 1;
 				float queue_priority = 1.0f;
 				queue_create_info.pQueuePriorities = &queue_priority;
 
+				// Descriptor for the logial device
 				VkDeviceCreateInfo device_create_info = {};
 				device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 				device_create_info.pQueueCreateInfos = &queue_create_info;
@@ -198,11 +212,18 @@ namespace bento
 				// Create the logical device from the physical device
 				assert_msg(vkCreateDevice(devices[best_device], &device_create_info, nullptr, &vk_re->logical_device) == VK_SUCCESS, "Logical device creation failed");
 
+				// Retrieve the rendering queue
+				vkGetDeviceQueue(vk_re->logical_device, vk_re->renderingQueueIdx, 0, &vk_re->renderingQueue);
+
 				// Create the surface that vulkan will be rendering into (inside the of the window)
 				assert_msg(glfwCreateWindowSurface(vk_re->instance, vk_re->window, nullptr, &(vk_re->surface)) == VK_SUCCESS, "Surface creation failed");
-
+				
 				// Queue for the present support
 				find_present_queue(vk_re, queueFamilyCount);
+				assert_msg(vk_re->presentQueueIdx != UINT32_MAX, "No valid present queue found");
+
+				// Retrieve the present queue
+				vkGetDeviceQueue(vk_re->logical_device, vk_re->presentQueueIdx, 0, &vk_re->presentQueue);
 
 				return (RenderEnvironment)vk_re;
 			}

@@ -24,6 +24,7 @@ namespace bento {
 
 	SafeSystemAllocator::~SafeSystemAllocator()
     {
+        assert(_currentAllocatedMemory == 0);
     }
 
     // Allocate a memory chunk give a particular alignment
