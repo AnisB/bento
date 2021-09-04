@@ -1,8 +1,8 @@
 // Bento includes
 #include <bento_base/security.h>
+#include <bento_base/log.h>
 #include <bento_memory/common.h>
 #include <bento_collection/vector.h>
-
 
 // Library includes
 #include "bento_graphics/vulkan_backend.h"
@@ -20,13 +20,18 @@
 	#include <GLFW/glfw3native.h>
 #endif
 
+#include <algorithm>
+
+#undef max
+#undef min
+
 namespace bento
 {
 	namespace vulkan
 	{
-		struct VKRenderEnvironment
+		struct VK_RenderEnvironment_Internal
 		{
-			// Platform speicifc window
+			// Platform specific window
 			GLFWwindow* window;
 
 			// Vulkan instance
@@ -65,11 +70,11 @@ namespace bento
 				glfwTerminate();
 			}
 
-			uint32_t first_compatible_device(VkPhysicalDevice* device_array, uint64_t num_devices)
+			uint32_t first_compatible_device(const bento::Vector<VkPhysicalDevice>& deviceArray)
 			{
-				for (uint32_t device_idx = 0; device_idx < num_devices; ++device_idx)
+				for (uint32_t device_idx = 0; device_idx < deviceArray.size(); ++device_idx)
 				{
-					VkPhysicalDevice& current_device = device_array[device_idx];
+					const VkPhysicalDevice& current_device = deviceArray[device_idx];
 
 					VkPhysicalDeviceProperties deviceProperties;
 					VkPhysicalDeviceFeatures deviceFeatures;
@@ -104,12 +109,11 @@ namespace bento
 				return UINT32_MAX;
 			}
 
-			void find_present_queue(VKRenderEnvironment* vk_re, uint32_t num_queues)
+			void find_present_queue(VK_RenderEnvironment_Internal* vk_re, uint32_t num_queues)
 			{
-				// Loop through the quques
+				// Loop through the queues
 				for (uint32_t queue_idx = 0; queue_idx < num_queues; ++queue_idx)
 				{
-					// 
 					VkBool32 present_support;
 					if (vkGetPhysicalDeviceSurfaceSupportKHR(vk_re->physical_device, queue_idx, vk_re->surface, &present_support) == VK_SUCCESS && present_support)
 					{
@@ -119,12 +123,75 @@ namespace bento
 				}
 			}
 
-			VkQueue retrieve_queue_by_index(VKRenderEnvironment* render_environement, uint32_t queue_index)
+			VkQueue retrieve_queue_by_index(VK_RenderEnvironment_Internal* render_environement, uint32_t queue_index)
 			{
 				assert(render_environement);
 				VkQueue graphicsQueue;
 				vkGetDeviceQueue(render_environement->logical_device, queue_index, 0, &graphicsQueue);
 				return graphicsQueue;
+			}
+
+			void enumerate_physical_devices(VkInstance& vkInstance, bento::Vector<VkPhysicalDevice>& devices)
+			{
+				// Make sure that at least one device can be used
+				uint32_t deviceCount = 0;
+				vkEnumeratePhysicalDevices(vkInstance, &deviceCount, nullptr);
+				assert_msg(deviceCount != 0, "No vulkan compatible devices");
+
+				// Grab the list of devices
+				devices.resize(deviceCount);
+				vkEnumeratePhysicalDevices(vkInstance, &deviceCount, devices.begin());
+			}
+
+			void enumerate_device_queue_family_properties(VkPhysicalDevice& vkPhysicalDevice, bento::Vector<VkQueueFamilyProperties>& queueFamilies)
+			{
+				// Get the number of queue families
+				uint32_t queueFamilyCount = 0;
+				vkGetPhysicalDeviceQueueFamilyProperties(vkPhysicalDevice, &queueFamilyCount, nullptr);
+
+				if (queueFamilyCount != 0)
+				{
+					// List the queue family properties
+					queueFamilies.resize(queueFamilyCount);
+					vkGetPhysicalDeviceQueueFamilyProperties(vkPhysicalDevice, &queueFamilyCount, queueFamilies.begin());
+				}
+			}
+
+			void enumerate_physical_device_formats(VkPhysicalDevice& vkPhysicalDevice, VkSurfaceKHR vkSurface, bento::Vector<VkSurfaceFormatKHR>& formats)
+			{
+				uint32_t formatCount;
+				vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, nullptr);
+
+				if (formatCount != 0)
+				{
+					formats.resize(formatCount);
+					vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, formats.begin());
+				}
+			}
+
+			void enumerate_physical_device_present_modes(VkPhysicalDevice& vkPhysicalDevice, VkSurfaceKHR vkSurface, bento::Vector<VkPresentModeKHR>& present_modes)
+			{
+				uint32_t presentModeCount;
+				vkGetPhysicalDeviceSurfacePresentModesKHR(vkPhysicalDevice, vkSurface, &presentModeCount, nullptr);
+
+				if (presentModeCount != 0)
+				{
+					present_modes.resize(presentModeCount);
+					vkGetPhysicalDeviceSurfacePresentModesKHR(vkPhysicalDevice, vkSurface, &presentModeCount, present_modes.begin());
+				}
+			}
+
+			VkExtent2D evaluate_swap_extent(GLFWwindow* window, const VkSurfaceCapabilitiesKHR& capabilities)
+			{
+				int width, height;
+				glfwGetFramebufferSize(window, &width, &height);
+				VkExtent2D actualExtent = {
+					static_cast<uint32_t>(width),
+					static_cast<uint32_t>(height)
+				};
+				actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(actualExtent.width, capabilities.maxImageExtent.width));
+				actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(actualExtent.height, capabilities.maxImageExtent.height));
+				return actualExtent;
 			}
 
 			RenderEnvironment create_render_environment(uint32_t width, uint32_t height, const char* windowName, bento::IAllocator& allocator)
@@ -133,14 +200,9 @@ namespace bento
 				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 				// Create our global structure for the render environment
-				VKRenderEnvironment* vk_re = bento::make_new<VKRenderEnvironment>(allocator);
+				VK_RenderEnvironment_Internal* vk_re = bento::make_new<VK_RenderEnvironment_Internal>(allocator);
 				vk_re->_allocator = &allocator;
 				vk_re->window = glfwCreateWindow(width, height, windowName, NULL, NULL);
-
-				// Grab all the extensions
-				unsigned int glfwExtensionCount = 0;
-				const char ** glfwExtensions;
-				glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
 				// Define our application info
 				VkApplicationInfo app_info = {};
@@ -151,6 +213,11 @@ namespace bento
 				app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 				app_info.apiVersion = VK_API_VERSION_1_0;
 
+				// Grab all the extensions that GLFW requires
+				unsigned int glfwExtensionCount = 0;
+				const char ** glfwExtensions;
+				glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
 				// Define our instance info
 				VkInstanceCreateInfo create_info = {};
 				create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -160,36 +227,26 @@ namespace bento
 				create_info.enabledLayerCount = 0;
 
 				// Create our vulkan instance
-				assert_msg(vkCreateInstance(&create_info, nullptr, &vk_re->instance) == VK_SUCCESS, "Failed to create a vulkan instance");
+				assert_msg(vkCreateInstance(&create_info, nullptr, &vk_re->instance) == VK_SUCCESS, "Failed to create a vulkan instance.");
 
-				// Make sure that at least one device can be used
-				uint32_t deviceCount = 0;
-				vkEnumeratePhysicalDevices(vk_re->instance, &deviceCount, nullptr);
-				assert_msg(deviceCount != 0, "No vulkan compatible devices");
+				// Grab the list of physical devices
+				bento::Vector<VkPhysicalDevice> devices(allocator);
+				enumerate_physical_devices(vk_re->instance, devices);
 
-				// Grab the list of devices
-				bento::Vector<VkPhysicalDevice> devices(allocator, deviceCount);
-				vkEnumeratePhysicalDevices(vk_re->instance, &deviceCount, devices.begin());
-
-				// Evaluate the device we shall be using
-				uint32_t best_device = first_compatible_device(devices.begin(), deviceCount);
+				// Evaluate which device we shall be using
+				uint32_t best_device = first_compatible_device(devices);
 				assert_msg(best_device != UINT32_MAX, "No compatible vulkan device");
 
 				// Keep track of the "best" physical device 
 				vk_re->physical_device = devices[(uint32_t)best_device];
 
-				// Get the number of queue famiies
-				uint32_t queueFamilyCount = 0;
-				vkGetPhysicalDeviceQueueFamilyProperties(vk_re->physical_device, &queueFamilyCount, nullptr);
-
-				// List the queue family properties
-				bento::Vector<VkQueueFamilyProperties> queueFamilies(allocator, queueFamilyCount);
-				vkGetPhysicalDeviceQueueFamilyProperties(vk_re->physical_device, &queueFamilyCount, queueFamilies.begin());
+				// Enumerate the queue family properties
+				bento::Vector<VkQueueFamilyProperties> queueFamilies(allocator);
+				enumerate_device_queue_family_properties(vk_re->physical_device, queueFamilies);
 
 				// Check for the queues
-				vk_re->renderingQueueIdx = find_rendering_queue(queueFamilies.begin(), queueFamilyCount);
+				vk_re->renderingQueueIdx = find_rendering_queue(queueFamilies.begin(), queueFamilies.size());
 				assert_msg(vk_re->renderingQueueIdx != UINT32_MAX, "No valid rendering queue found");
-
 
 				// Queue creation descriptor
 				VkDeviceQueueCreateInfo queue_create_info = {};
@@ -199,14 +256,20 @@ namespace bento
 				float queue_priority = 1.0f;
 				queue_create_info.pQueuePriorities = &queue_priority;
 
-				// Descriptor for the logial device
+				// Allocator the vector that holds all the additional extensions that are required
+				bento::Vector<const char*> requiredExtensions(allocator, 1);
+				// The swap chain extension
+				requiredExtensions[0] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+
+				// Descriptor for the logical device
 				VkDeviceCreateInfo device_create_info = {};
 				device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 				device_create_info.pQueueCreateInfos = &queue_create_info;
 				device_create_info.queueCreateInfoCount = 1;
 				VkPhysicalDeviceFeatures deviceFeatures = {};
 				device_create_info.pEnabledFeatures = &deviceFeatures;
-				device_create_info.enabledExtensionCount = 0;
+				device_create_info.enabledExtensionCount = requiredExtensions.size();
+				device_create_info.ppEnabledExtensionNames = requiredExtensions.begin();
 				device_create_info.enabledLayerCount = 0;
 
 				// Create the logical device from the physical device
@@ -219,11 +282,66 @@ namespace bento
 				assert_msg(glfwCreateWindowSurface(vk_re->instance, vk_re->window, nullptr, &(vk_re->surface)) == VK_SUCCESS, "Surface creation failed");
 				
 				// Queue for the present support
-				find_present_queue(vk_re, queueFamilyCount);
+				find_present_queue(vk_re, queueFamilies.size());
 				assert_msg(vk_re->presentQueueIdx != UINT32_MAX, "No valid present queue found");
 
 				// Retrieve the present queue
 				vkGetDeviceQueue(vk_re->logical_device, vk_re->presentQueueIdx, 0, &vk_re->presentQueue);
+
+				// Get the capabilities of the physical device
+				VkSurfaceCapabilitiesKHR capabilities;
+				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_re->physical_device, vk_re->surface, &capabilities);
+				VkExtent2D extent = evaluate_swap_extent(vk_re->window, capabilities);
+
+				// Enumerate all the formats
+				bento::Vector<VkSurfaceFormatKHR> formats(allocator);
+				enumerate_physical_device_formats(vk_re->physical_device, vk_re->surface, formats);
+				assert_msg(formats.size() != 0, "No device formats available.");
+
+				// Loop through the formats and look for one that fits our needs
+				uint32_t targetFormat = UINT32_MAX;
+				for (uint32_t formatIdx = 0; formatIdx < formats.size(); ++formatIdx)
+				{
+					// Grab the current format
+					const VkSurfaceFormatKHR& currentFormat = formats[formatIdx];
+					if (currentFormat.format == VK_FORMAT_B8G8R8A8_SRGB 
+						&& currentFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+					{
+						targetFormat = formatIdx;
+						break;
+					}
+				}
+				assert_msg(targetFormat != UINT32_MAX, "No valid format found.");
+
+				// Enumerate all the present modes
+				bento::Vector<VkPresentModeKHR> presentModes(allocator);
+				enumerate_physical_device_present_modes(vk_re->physical_device, vk_re->surface, presentModes);
+				assert_msg(presentModes.size() != 0, "No present modes available.");
+
+				// Look for the present mode we need
+				uint32_t targetMode = UINT32_MAX;
+				for (uint32_t modeIdx = 0; modeIdx < presentModes.size(); ++modeIdx)
+				{
+					// Grab the current format
+					const VkPresentModeKHR& currentMode = presentModes[modeIdx];
+					if (currentMode == VK_PRESENT_MODE_FIFO_KHR)
+					{
+						targetMode = modeIdx;
+						break;
+					}
+				}
+				assert_msg(targetMode != UINT32_MAX, "No valid present mode found.");
+
+
+				VkSwapchainCreateInfoKHR createInfo{};
+				createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+				createInfo.surface = vk_re->surface;
+				createInfo.minImageCount = capabilities.minImageCount + 1;
+				createInfo.imageFormat = formats[targetFormat].format;
+				createInfo.imageColorSpace = formats[targetFormat].colorSpace;
+				createInfo.imageExtent = extent;
+				createInfo.imageArrayLayers = 1;
+				createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
 				return (RenderEnvironment)vk_re;
 			}
@@ -231,7 +349,7 @@ namespace bento
 			void destroy_render_environment(RenderEnvironment render_environment)
 			{
 				// Cast the pointer and make sure it is not null
-				VKRenderEnvironment* vk_re = (VKRenderEnvironment*)render_environment;
+				VK_RenderEnvironment_Internal* vk_re = (VK_RenderEnvironment_Internal*)render_environment;
 				assert(vk_re != nullptr);
 
 				// Destroy the vulkan structures
@@ -243,12 +361,12 @@ namespace bento
 				glfwDestroyWindow(vk_re->window);
 
 				// Destroy the internal structure
-				bento::make_delete<VKRenderEnvironment>(*vk_re->_allocator, vk_re);
+				bento::make_delete<VK_RenderEnvironment_Internal>(*vk_re->_allocator, vk_re);
 			}
 
 			RenderWindow render_window(RenderEnvironment render_environement)
 			{
-				VKRenderEnvironment* vk_re = (VKRenderEnvironment*)render_environement;
+				VK_RenderEnvironment_Internal* vk_re = (VK_RenderEnvironment_Internal*)render_environement;
 				return (RenderWindow)vk_re->window;
 			}
 
@@ -290,23 +408,108 @@ namespace bento
 			}
 		}
 
-		namespace framebuffer
+		namespace command_buffer
 		{
-			struct VK_FrameBuffer
+			struct VK_CommandBuffer_Internal
 			{
-				VkFramebuffer vkFrameBuffer;
-				VKRenderEnvironment* vkRenderEnvironement;
+				// Current render environment
+				VK_RenderEnvironment_Internal* renderEnvironement;
+
+				// Target command pool used to allocate the command buffer
+				VkCommandPool commandPool;
+
+				// Target command buffer
+				VkCommandBuffer commandBuffer;
+
+				// Allocator used for the structure
 				bento::IAllocator* _allocator;
 			};
 
-			FramebufferObject create(RenderEnvironment renderEnviroment, bento::IAllocator& allocator)
+			CommandBuffer create(RenderEnvironment render_environment, IAllocator& allocator)
 			{
 				// Cast the render environment and make sure it is not null
-				VKRenderEnvironment* vkRenderEnvironement = (VKRenderEnvironment*)renderEnviroment;
+				VK_RenderEnvironment_Internal* vkRenderEnvironment = (VK_RenderEnvironment_Internal*)render_environment;
+				assert(vkRenderEnvironment != nullptr);
+
+				// Create the internal structure of the command buffer
+				VK_CommandBuffer_Internal* vk_commandBuffer = bento::make_new<VK_CommandBuffer_Internal>(allocator);
+				vk_commandBuffer->renderEnvironement = vkRenderEnvironment;
+				vk_commandBuffer->_allocator = &allocator;
+
+				// Create the command pool
+				VkCommandPoolCreateInfo poolInfo{};
+				poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+				poolInfo.queueFamilyIndex = vkRenderEnvironment->renderingQueueIdx;
+				poolInfo.flags = 0; // Optional
+				assert_msg(vkCreateCommandPool(vkRenderEnvironment->logical_device, &poolInfo, nullptr, &vk_commandBuffer->commandPool) == VK_SUCCESS, "Failed to create command pool.");
+
+				// Allocate the command buffer
+				VkCommandBufferAllocateInfo allocInfo{};
+				allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+				allocInfo.commandPool = vk_commandBuffer->commandPool;
+				allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+				allocInfo.commandBufferCount = 1;
+				assert_msg(vkAllocateCommandBuffers(vkRenderEnvironment->logical_device, &allocInfo, &vk_commandBuffer->commandBuffer) == VK_SUCCESS, "Failed to allocate the command buffers.");
+
+				// Cast and return the command buffer
+				return (CommandBuffer)vk_commandBuffer;
+			}
+
+			void destroy(CommandBuffer command_buffer)
+			{
+				// Cast our internal structure
+				VK_CommandBuffer_Internal* vk_commandBuffer = (VK_CommandBuffer_Internal*)command_buffer;
+				assert(vk_commandBuffer != nullptr);
+
+				// Destroy the command pool
+				vkDestroyCommandPool(vk_commandBuffer->renderEnvironement->logical_device, vk_commandBuffer->commandPool, nullptr);
+
+				// Destroy the internal structure
+				bento::make_delete<VK_CommandBuffer_Internal>(*vk_commandBuffer->_allocator, vk_commandBuffer);
+			}
+
+			void start_record(CommandBuffer command_buffer)
+			{
+				// Cast our internal structure
+				VK_CommandBuffer_Internal* vk_commandBuffer = (VK_CommandBuffer_Internal*)command_buffer;
+				assert(vk_commandBuffer != nullptr);
+
+				// Start recording the command buffer
+				VkCommandBufferBeginInfo beginInfo{};
+				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+				beginInfo.flags = 0; // Optional
+				beginInfo.pInheritanceInfo = nullptr; // Optional
+				assert_msg(vkBeginCommandBuffer(vk_commandBuffer->commandBuffer, &beginInfo) == VK_SUCCESS, "failed to begin recording command buffer.");
+			}
+
+			void stop_record(CommandBuffer command_buffer)
+			{
+				// Cast our internal structure
+				VK_CommandBuffer_Internal* vk_commandBuffer = (VK_CommandBuffer_Internal*)command_buffer;
+				assert(vk_commandBuffer != nullptr);
+
+				// End recording the command buffer
+				assert_msg(vkEndCommandBuffer(vk_commandBuffer->commandBuffer) == VK_SUCCESS, "Failed to stop recording the command buffer.");
+			}
+		}
+
+		namespace framebuffer
+		{
+			struct VK_FrameBuffer_Internal
+			{
+				VkFramebuffer vkFrameBuffer;
+				VK_RenderEnvironment_Internal* vkRenderEnvironement;
+				bento::IAllocator* _allocator;
+			};
+
+			FramebufferObject create(RenderEnvironment render_environment, bento::IAllocator& allocator)
+			{
+				// Cast the render environment and make sure it is not null
+				VK_RenderEnvironment_Internal* vkRenderEnvironement = (VK_RenderEnvironment_Internal*)render_environment;
 				assert(vkRenderEnvironement != nullptr);
 				
 				// Allocate the structure
-				VK_FrameBuffer* vkFrameBuffer = bento::make_new<VK_FrameBuffer>(allocator);
+				VK_FrameBuffer_Internal* vkFrameBuffer = bento::make_new<VK_FrameBuffer_Internal>(allocator);
 				vkFrameBuffer->vkRenderEnvironement = vkRenderEnvironement;
 				vkFrameBuffer->_allocator = &allocator;
 
@@ -327,14 +530,14 @@ namespace bento
 			void destroy(FramebufferObject frame_buffer)
 			{
 				// Cast and make sure it is not null
-				VK_FrameBuffer* vkFrameBuffer = (VK_FrameBuffer*)frame_buffer;
+				VK_FrameBuffer_Internal* vkFrameBuffer = (VK_FrameBuffer_Internal*)frame_buffer;
 				assert(vkFrameBuffer != nullptr);
 
 				// Destroy the vulkan frame buffer
 				vkDestroyFramebuffer(vkFrameBuffer->vkRenderEnvironement->logical_device, vkFrameBuffer->vkFrameBuffer, nullptr);
 
 				// Destroy our structure
-				bento::make_delete<VK_FrameBuffer>(*vkFrameBuffer->_allocator, vkFrameBuffer);
+				bento::make_delete<VK_FrameBuffer_Internal>(*vkFrameBuffer->_allocator, vkFrameBuffer);
 			}
 
 			bool check(FramebufferObject)

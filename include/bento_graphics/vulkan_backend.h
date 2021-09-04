@@ -14,21 +14,27 @@ namespace bento
 	typedef uint64_t TextureObject;
 	typedef uint64_t CubemapObject;
 	typedef uint64_t ShaderPipelineObject;
+	typedef uint64_t CommandBuffer;
 
 	namespace vulkan
 	{
 		namespace render_system
 		{
+			// Render system
 			bool init_render_system();
 			void shutdown_render_system();
 
+			// Render environment
 			RenderEnvironment create_render_environment(uint32_t width, uint32_t height, const char* windowName, bento::IAllocator& allocator);
 			void destroy_render_environment(RenderEnvironment render_environment);
 
+			// Returns the native window
 			RenderWindow render_window(RenderEnvironment render_environement);
 
+			// Collects the set of inputs
 			void collect_inputs(RenderEnvironment render_environement);
 
+			// Return the global time of the application
 			float get_time(RenderEnvironment render_environement);
 		}
 
@@ -40,7 +46,15 @@ namespace bento
 			void swap(RenderWindow window);
 		}
 
-		namespace framebuffer
+		namespace command_buffer
+		{
+			CommandBuffer create(RenderEnvironment render_environment, IAllocator& allocator);
+			void destroy(CommandBuffer command_buffer);
+			void start_record(CommandBuffer command_buffer);
+			void stop_record(CommandBuffer command_buffer);
+		}
+
+		namespace frame_buffer
 		{
 			FramebufferObject create(RenderEnvironment renderEnvironment, bento::IAllocator& allocator);
 			void destroy(FramebufferObject frame_buffer);
