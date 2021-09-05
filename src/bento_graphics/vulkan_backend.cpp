@@ -20,8 +20,10 @@
 	#include <GLFW/glfw3native.h>
 #endif
 
+// Other includes
 #include <algorithm>
 
+// To avoid collision with the macros
 #undef max
 #undef min
 
@@ -29,12 +31,25 @@ namespace bento
 {
 	namespace vulkan
 	{
-		struct VK_RenderEnvironment_Internal
+		class VK_RenderEnvironment_Internal
 		{
+		public:
+			ALLOCATOR_BASED;
+			VK_RenderEnvironment_Internal(bento::IAllocator& allocator)
+			: _allocator(allocator)
+			, window(nullptr)
+			, renderingQueueIdx(UINT32_MAX)
+			, presentQueueIdx(UINT32_MAX)
+			, swapChainImages(allocator)
+			, swapChainImageViews(allocator)
+			{
+
+			}
+
 			// Platform specific window
 			GLFWwindow* window;
 
-			// Vulkan instance
+			// VK instance
 			VkInstance instance;
 
 			// Physical device (GPU)
@@ -54,8 +69,15 @@ namespace bento
 			uint32_t presentQueueIdx;
 			VkQueue presentQueue;
 
+			// Swap chain data
+			VkSwapchainKHR swapChain;
+			VkFormat swapChainImageFormat;
+			VkExtent2D swapChainExtent;
+			bento::Vector<VkImage> swapChainImages;
+			bento::Vector<VkImageView> swapChainImageViews;
+
 			// Allocator used for the structure
-			bento::IAllocator* _allocator;
+			bento::IAllocator& _allocator;
 		};
 
 		namespace render_system
@@ -194,100 +216,8 @@ namespace bento
 				return actualExtent;
 			}
 
-			RenderEnvironment create_render_environment(uint32_t width, uint32_t height, const char* windowName, bento::IAllocator& allocator)
+			void create_swap_chain(VK_RenderEnvironment_Internal* vk_re, IAllocator& allocator)
 			{
-				// Hint to glfw that we will be using vulkan
-				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-				// Create our global structure for the render environment
-				VK_RenderEnvironment_Internal* vk_re = bento::make_new<VK_RenderEnvironment_Internal>(allocator);
-				vk_re->_allocator = &allocator;
-				vk_re->window = glfwCreateWindow(width, height, windowName, NULL, NULL);
-
-				// Define our application info
-				VkApplicationInfo app_info = {};
-				app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-				app_info.pApplicationName = windowName;
-				app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-				app_info.pEngineName = "bento";
-				app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-				app_info.apiVersion = VK_API_VERSION_1_0;
-
-				// Grab all the extensions that GLFW requires
-				unsigned int glfwExtensionCount = 0;
-				const char ** glfwExtensions;
-				glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-				// Define our instance info
-				VkInstanceCreateInfo create_info = {};
-				create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-				create_info.pApplicationInfo = &app_info;
-				create_info.enabledExtensionCount = glfwExtensionCount;
-				create_info.ppEnabledExtensionNames = glfwExtensions;
-				create_info.enabledLayerCount = 0;
-
-				// Create our vulkan instance
-				assert_msg(vkCreateInstance(&create_info, nullptr, &vk_re->instance) == VK_SUCCESS, "Failed to create a vulkan instance.");
-
-				// Grab the list of physical devices
-				bento::Vector<VkPhysicalDevice> devices(allocator);
-				enumerate_physical_devices(vk_re->instance, devices);
-
-				// Evaluate which device we shall be using
-				uint32_t best_device = first_compatible_device(devices);
-				assert_msg(best_device != UINT32_MAX, "No compatible vulkan device");
-
-				// Keep track of the "best" physical device 
-				vk_re->physical_device = devices[(uint32_t)best_device];
-
-				// Enumerate the queue family properties
-				bento::Vector<VkQueueFamilyProperties> queueFamilies(allocator);
-				enumerate_device_queue_family_properties(vk_re->physical_device, queueFamilies);
-
-				// Check for the queues
-				vk_re->renderingQueueIdx = find_rendering_queue(queueFamilies.begin(), queueFamilies.size());
-				assert_msg(vk_re->renderingQueueIdx != UINT32_MAX, "No valid rendering queue found");
-
-				// Queue creation descriptor
-				VkDeviceQueueCreateInfo queue_create_info = {};
-				queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-				queue_create_info.queueFamilyIndex = vk_re->renderingQueueIdx;
-				queue_create_info.queueCount = 1;
-				float queue_priority = 1.0f;
-				queue_create_info.pQueuePriorities = &queue_priority;
-
-				// Allocator the vector that holds all the additional extensions that are required
-				bento::Vector<const char*> requiredExtensions(allocator, 1);
-				// The swap chain extension
-				requiredExtensions[0] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-
-				// Descriptor for the logical device
-				VkDeviceCreateInfo device_create_info = {};
-				device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-				device_create_info.pQueueCreateInfos = &queue_create_info;
-				device_create_info.queueCreateInfoCount = 1;
-				VkPhysicalDeviceFeatures deviceFeatures = {};
-				device_create_info.pEnabledFeatures = &deviceFeatures;
-				device_create_info.enabledExtensionCount = requiredExtensions.size();
-				device_create_info.ppEnabledExtensionNames = requiredExtensions.begin();
-				device_create_info.enabledLayerCount = 0;
-
-				// Create the logical device from the physical device
-				assert_msg(vkCreateDevice(devices[best_device], &device_create_info, nullptr, &vk_re->logical_device) == VK_SUCCESS, "Logical device creation failed");
-
-				// Retrieve the rendering queue
-				vkGetDeviceQueue(vk_re->logical_device, vk_re->renderingQueueIdx, 0, &vk_re->renderingQueue);
-
-				// Create the surface that vulkan will be rendering into (inside the of the window)
-				assert_msg(glfwCreateWindowSurface(vk_re->instance, vk_re->window, nullptr, &(vk_re->surface)) == VK_SUCCESS, "Surface creation failed");
-				
-				// Queue for the present support
-				find_present_queue(vk_re, queueFamilies.size());
-				assert_msg(vk_re->presentQueueIdx != UINT32_MAX, "No valid present queue found");
-
-				// Retrieve the present queue
-				vkGetDeviceQueue(vk_re->logical_device, vk_re->presentQueueIdx, 0, &vk_re->presentQueue);
-
 				// Get the capabilities of the physical device
 				VkSurfaceCapabilitiesKHR capabilities;
 				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_re->physical_device, vk_re->surface, &capabilities);
@@ -304,7 +234,7 @@ namespace bento
 				{
 					// Grab the current format
 					const VkSurfaceFormatKHR& currentFormat = formats[formatIdx];
-					if (currentFormat.format == VK_FORMAT_B8G8R8A8_SRGB 
+					if (currentFormat.format == VK_FORMAT_B8G8R8A8_SRGB
 						&& currentFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 					{
 						targetFormat = formatIdx;
@@ -332,7 +262,6 @@ namespace bento
 				}
 				assert_msg(targetMode != UINT32_MAX, "No valid present mode found.");
 
-
 				VkSwapchainCreateInfoKHR createInfo{};
 				createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 				createInfo.surface = vk_re->surface;
@@ -343,6 +272,177 @@ namespace bento
 				createInfo.imageArrayLayers = 1;
 				createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
+				if (vk_re->renderingQueueIdx != vk_re->presentQueueIdx)
+				{
+					uint32_t queueFamilyIndices[] = { vk_re->renderingQueueIdx, vk_re->presentQueueIdx };
+					createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+					createInfo.queueFamilyIndexCount = 2;
+					createInfo.pQueueFamilyIndices = queueFamilyIndices;
+				}
+				else {
+					createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+					createInfo.queueFamilyIndexCount = 0; // Optional
+					createInfo.pQueueFamilyIndices = nullptr; // Optional
+				}
+				createInfo.preTransform = capabilities.currentTransform;
+				createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+				createInfo.presentMode = presentModes[targetMode];
+				createInfo.clipped = VK_TRUE;
+				createInfo.oldSwapchain = VK_NULL_HANDLE;
+				assert_msg(vkCreateSwapchainKHR(vk_re->logical_device, &createInfo, nullptr, &vk_re->swapChain) == VK_SUCCESS, "Failed to create swap chain.");
+
+				// Grab all the swap chain images
+				uint32_t imageCount;
+				vkGetSwapchainImagesKHR(vk_re->logical_device, vk_re->swapChain, &imageCount, nullptr);
+				vk_re->swapChainImages.resize(imageCount);
+				vkGetSwapchainImagesKHR(vk_re->logical_device, vk_re->swapChain, &imageCount, vk_re->swapChainImages.begin());
+
+				// Keep track of the additional data
+				vk_re->swapChainImageFormat = formats[targetFormat].format;
+				vk_re->swapChainExtent = extent;
+
+				// Allocate for the image view
+				vk_re->swapChainImageViews.resize(imageCount);
+
+				// Create the image views
+				for (uint32_t i = 0; i < imageCount; i++)
+				{
+					VkImageViewCreateInfo createInfoIV{};
+					createInfoIV.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+					createInfoIV.image = vk_re->swapChainImages[i];
+					createInfoIV.viewType = VK_IMAGE_VIEW_TYPE_2D;
+					createInfoIV.format = vk_re->swapChainImageFormat;
+					createInfoIV.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+					createInfoIV.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+					createInfoIV.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+					createInfoIV.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+					createInfoIV.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					createInfoIV.subresourceRange.baseMipLevel = 0;
+					createInfoIV.subresourceRange.levelCount = 1;
+					createInfoIV.subresourceRange.baseArrayLayer = 0;
+					createInfoIV.subresourceRange.layerCount = 1;
+
+					// Create the actual image view
+					assert_msg(vkCreateImageView(vk_re->logical_device, &createInfoIV, nullptr, &vk_re->swapChainImageViews[i]) == VK_SUCCESS, "Failed to create image views.");
+				}
+			}
+
+			void pick_physical_device(VK_RenderEnvironment_Internal* vk_re, IAllocator& allocator)
+			{
+				// Grab the list of physical devices
+				bento::Vector<VkPhysicalDevice> devices(allocator);
+				enumerate_physical_devices(vk_re->instance, devices);
+
+				// Evaluate which device we shall be using
+				uint32_t best_device = first_compatible_device(devices);
+				assert_msg(best_device != UINT32_MAX, "No compatible vulkan device");
+
+				// Keep track of the "best" physical device 
+				vk_re->physical_device = devices[(uint32_t)best_device];
+			}
+
+			void create_logical_device(VK_RenderEnvironment_Internal* vk_re, IAllocator& allocator)
+			{
+				// Queue creation descriptor
+				VkDeviceQueueCreateInfo queue_create_info = {};
+				queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+				queue_create_info.queueFamilyIndex = vk_re->renderingQueueIdx;
+				queue_create_info.queueCount = 1;
+				float queue_priority = 1.0f;
+				queue_create_info.pQueuePriorities = &queue_priority;
+
+				// Allocator the vector that holds all the additional extensions that are required
+				bento::Vector<const char*> requiredExtensions(allocator, 1);
+				// The swap chain extension
+				requiredExtensions[0] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+
+				// Descriptor for the logical device
+				VkDeviceCreateInfo device_create_info = {};
+				device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+				device_create_info.pQueueCreateInfos = &queue_create_info;
+				device_create_info.queueCreateInfoCount = 1;
+
+				VkPhysicalDeviceFeatures deviceFeatures = {};
+				device_create_info.pEnabledFeatures = &deviceFeatures;
+				device_create_info.enabledExtensionCount = requiredExtensions.size();
+				device_create_info.ppEnabledExtensionNames = requiredExtensions.begin();
+				device_create_info.enabledLayerCount = 0;
+
+				// Create the logical device from the physical device
+				assert_msg(vkCreateDevice(vk_re->physical_device, &device_create_info, nullptr, &vk_re->logical_device) == VK_SUCCESS, "Logical device creation failed");
+			}
+
+			void create_vulkan_instance(VK_RenderEnvironment_Internal* vk_re, const char* window_name)
+			{
+				// Define our application info
+				VkApplicationInfo app_info = {};
+				app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+				app_info.pApplicationName = window_name;
+				app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+				app_info.pEngineName = "bento";
+				app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+				app_info.apiVersion = VK_API_VERSION_1_0;
+
+				// Grab all the extensions that GLFW requires
+				unsigned int glfwExtensionCount = 0;
+				const char ** glfwExtensions;
+				glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+				// Define our instance info
+				VkInstanceCreateInfo create_info = {};
+				create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+				create_info.pApplicationInfo = &app_info;
+				create_info.enabledExtensionCount = glfwExtensionCount;
+				create_info.ppEnabledExtensionNames = glfwExtensions;
+				create_info.enabledLayerCount = 0;
+
+				// Create our vulkan instance
+				assert_msg(vkCreateInstance(&create_info, nullptr, &vk_re->instance) == VK_SUCCESS, "Failed to create a vulkan instance.");
+			}
+
+			RenderEnvironment create_render_environment(uint32_t width, uint32_t height, const char* windowName, bento::IAllocator& allocator)
+			{
+				// Hint to GLFW that we will be using vulkan
+				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+				// Create our global structure for the render environment
+				VK_RenderEnvironment_Internal* vk_re = bento::make_new<VK_RenderEnvironment_Internal>(allocator, allocator);
+				vk_re->window = glfwCreateWindow(width, height, windowName, NULL, NULL);
+
+				// Create the vulkan instance
+				create_vulkan_instance(vk_re, windowName);
+
+				// Pick a physical device
+				pick_physical_device(vk_re, allocator);
+
+				// Enumerate the queue family properties
+				bento::Vector<VkQueueFamilyProperties> queueFamilies(allocator);
+				enumerate_device_queue_family_properties(vk_re->physical_device, queueFamilies);
+
+				// Find the rendering queue (graphics, compute and transfer)
+				vk_re->renderingQueueIdx = find_rendering_queue(queueFamilies.begin(), queueFamilies.size());
+				assert_msg(vk_re->renderingQueueIdx != UINT32_MAX, "No valid rendering queue found");
+
+				// Create the logical device
+				create_logical_device(vk_re, allocator);
+
+				// Retrieve the rendering queue
+				vkGetDeviceQueue(vk_re->logical_device, vk_re->renderingQueueIdx, 0, &vk_re->renderingQueue);
+
+				// Create the surface that vulkan will be rendering into (inside the of the window)
+				assert_msg(glfwCreateWindowSurface(vk_re->instance, vk_re->window, nullptr, &(vk_re->surface)) == VK_SUCCESS, "Surface creation failed");
+				
+				// Queue for the present support
+				find_present_queue(vk_re, queueFamilies.size());
+				assert_msg(vk_re->presentQueueIdx != UINT32_MAX, "No valid present queue found");
+
+				// Retrieve the present queue
+				vkGetDeviceQueue(vk_re->logical_device, vk_re->presentQueueIdx, 0, &vk_re->presentQueue);
+
+				// Create the swap chain
+				create_swap_chain(vk_re, allocator);
+
+				// Opaque cast and return our internal structure
 				return (RenderEnvironment)vk_re;
 			}
 
@@ -353,6 +453,10 @@ namespace bento
 				assert(vk_re != nullptr);
 
 				// Destroy the vulkan structures
+				uint32_t imageViewCount = vk_re->swapChainImageViews.size();
+				for (uint32_t imageIdx = 0; imageIdx < imageViewCount; ++imageIdx)
+					vkDestroyImageView(vk_re->logical_device, vk_re->swapChainImageViews[imageIdx], nullptr);
+				vkDestroySwapchainKHR(vk_re->logical_device, vk_re->swapChain, nullptr);
 				vkDestroySurfaceKHR(vk_re->instance, vk_re->surface, nullptr);
 				vkDestroyDevice(vk_re->logical_device, nullptr);
 				vkDestroyInstance(vk_re->instance, nullptr);
@@ -361,7 +465,7 @@ namespace bento
 				glfwDestroyWindow(vk_re->window);
 
 				// Destroy the internal structure
-				bento::make_delete<VK_RenderEnvironment_Internal>(*vk_re->_allocator, vk_re);
+				bento::make_delete<VK_RenderEnvironment_Internal>(vk_re->_allocator, vk_re);
 			}
 
 			RenderWindow render_window(RenderEnvironment render_environement)

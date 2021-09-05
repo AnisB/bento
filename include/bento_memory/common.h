@@ -68,6 +68,7 @@ namespace bento {
 	template<typename T>
 	inline void make_delete(IAllocator& allocator, T* target_ptr)
 	{
+		target_ptr->~T();
 		allocator.deallocate(target_ptr);
 	}
 
