@@ -12,7 +12,7 @@ namespace bento
     // Command buffer    
     typedef uint64_t CommandBuffer;
 
-    // Rneder pass
+    // Render pass
     typedef uint64_t RenderPassObject;
 
     // Frame buffer
@@ -22,23 +22,68 @@ namespace bento
     typedef uint64_t TextureObject;
     typedef uint64_t BufferObject;
 
-    namespace render_pass
-    {
-        struct RenderPassDescriptor
-        {
-            ALLOCATOR_BASED;
-            RenderPassDescriptor(bento::IAllocator& allocator)
-            : textureArray(allocator)
-            , bufferArray(allocator)
-            , _allocator(allocator)
-            {
-            }
+	// Graphics Pipeline
+	typedef uint64_t GraphicsPipelineObject;
 
-            Vector<TextureObject> textureArray;
-            Vector<BufferObject> bufferArray;
-            IAllocator& _allocator;
-        };
-    }
+	// Descriptor for using a graphics pipeline to draw
+	struct DrawDescriptor
+	{
+		ALLOCATOR_BASED;
+		DrawDescriptor(bento::IAllocator& allocator)
+		: pipeline(0)
+		, textureArray(allocator)
+		, bufferArray(allocator)
+		, renderTargets(allocator)
+		, depthBuffer(0)
+		, _allocator(allocator)
+		{
+		}
+
+		// Pipeline used for the draw
+		GraphicsPipelineObject pipeline;
+
+		// Set of input textures
+		Vector<TextureObject> textureArray;
+
+		// Set of input buffers
+		Vector<BufferObject> bufferArray;
+
+		// Output render targets
+		Vector<TextureObject> renderTargets;
+
+		// Output depth buffer
+		TextureObject depthBuffer;
+
+		// Internal allocator
+		IAllocator& _allocator;
+	};
+
+	// Compute Kernel
+	typedef uint64_t ComputeKernelObject;
+
+	struct DispatchDescriptor
+	{
+		ALLOCATOR_BASED;
+		DispatchDescriptor(bento::IAllocator& allocator)
+		: computeKernel(0)
+		, textureArray(allocator)
+		, bufferArray(allocator)
+		, _allocator(allocator)
+		{
+		}
+
+		// Kernel used for the dispatch
+		ComputeKernelObject computeKernel;
+
+		// Set of input textures
+		Vector<TextureObject> textureArray;
+
+		// Set of input buffers
+		Vector<BufferObject> bufferArray;
+
+		// Internal allocator
+		IAllocator& _allocator;
+	};
 
     namespace texture
     {

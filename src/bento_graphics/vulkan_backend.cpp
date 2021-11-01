@@ -598,53 +598,6 @@ namespace bento
             }
         }
 
-        namespace render_pass
-        {
-            struct VK_RenderPass_Internal
-            {
-                VkRenderPass renderPass;
-                VK_RenderEnvironment_Internal* vkRenderEnvironement;
-                bento::IAllocator* _allocator;
-            };
-
-            RenderPassObject create(RenderEnvironment renderEnvironment, bento::render_pass::RenderPassDescriptor& rpDescriptor, bento::IAllocator& allocator)
-            {
-                // Cast the render environment and make sure it is not null
-                VK_RenderEnvironment_Internal* vkRenderEnvironement = (VK_RenderEnvironment_Internal*)renderEnvironment;
-                assert(vkRenderEnvironement != nullptr);
-
-                // Allocate the structure
-                VK_RenderPass_Internal* vkiRenderPass = bento::make_new<VK_RenderPass_Internal>(allocator);
-                vkiRenderPass->vkRenderEnvironement = vkRenderEnvironement;
-                vkiRenderPass->_allocator = &allocator;
-
-                // Create the vulkan object
-                VkRenderPassCreateInfo renderPassInfo{};
-                renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-                renderPassInfo.attachmentCount = rpDescriptor.textureArray.size();
-                renderPassInfo.pAttachments = nullptr;
-                renderPassInfo.subpassCount = 0;
-                renderPassInfo.pSubpasses = nullptr;
-                assert_msg(vkCreateRenderPass(vkRenderEnvironement->logical_device, &renderPassInfo, nullptr, &vkiRenderPass->renderPass) == VK_SUCCESS, "Failed to create render pass!");
-                
-                // Convert to opaque type
-                return (RenderPassObject)vkiRenderPass;
-            }
-
-            void destroy(RenderPassObject render_pass)
-            {
-                // Cast and make sure it is not null
-                VK_RenderPass_Internal* vkRenderPass = (VK_RenderPass_Internal*)render_pass;
-                assert(vkRenderPass != nullptr);
-
-                // Desotry the render pass
-                vkDestroyRenderPass(vkRenderPass->vkRenderEnvironement->logical_device, vkRenderPass->renderPass, nullptr);
-
-                // Destroy the internal structure
-                bento::make_delete<VK_RenderPass_Internal>(*vkRenderPass->_allocator, vkRenderPass);
-            }
-        }
-
         namespace framebuffer
         {
             struct VK_FrameBuffer_Internal
@@ -797,7 +750,7 @@ namespace bento
                 imageInfo.extent.width = textureDescriptor.width;
                 imageInfo.extent.height = textureDescriptor.height;
                 imageInfo.extent.depth = textureDescriptor.depth;
-                imageInfo.mipLevels = textureDescriptor.hasMips? (uint32_t)log2(std::max(textureDescriptor.width, textureDescriptor.height)) : 1;
+                imageInfo.mipLevels = textureDescriptor.hasMips ? (uint32_t)log2(std::max(textureDescriptor.width, textureDescriptor.height)) : 1;
                 imageInfo.arrayLayers = 1;
                 imageInfo.format = GenericToVulkanTextureFormat(textureDescriptor.format);
                 imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -825,6 +778,106 @@ namespace bento
                 bento::make_delete<VK_Image_Internal>(*vkImage->_allocator, vkImage);
             }
         }
+
+		namespace render_pass
+		{
+			struct VK_RenderPass_Internal
+			{
+				ALLOCATOR_BASED;
+				VK_RenderPass_Internal(bento::IAllocator& allocator)
+				: renderPass(nullptr)
+				, vkRenderEnvironement(nullptr)
+				, attachements(allocator)
+				, attachementsRef(allocator)
+				, _allocator(&allocator)
+				{
+				}
+
+				// Internal vulkan render pass
+				VkRenderPass renderPass;
+
+				// Color attachments
+				Vector<VkAttachmentDescription> attachements;
+				Vector<VkAttachmentReference> attachementsRef;
+
+				// Internal vulkan environment data
+				VK_RenderEnvironment_Internal* vkRenderEnvironement;
+
+				// Allocator used for this 
+				bento::IAllocator* _allocator;
+			};
+
+			RenderPassObject create(RenderEnvironment renderEnvironment, bento::DrawDescriptor& drawDescriptor, bento::IAllocator& allocator)
+			{
+				// Cast the render environment and make sure it is not null
+				VK_RenderEnvironment_Internal* vkRenderEnvironement = (VK_RenderEnvironment_Internal*)renderEnvironment;
+				assert(vkRenderEnvironement != nullptr);
+
+				// Allocate the structure
+				VK_RenderPass_Internal* vkRenderPass = bento::make_new<VK_RenderPass_Internal>(allocator, allocator);
+				vkRenderPass->vkRenderEnvironement = vkRenderEnvironement;
+
+				// We need to declare all our attachements
+				uint32_t numTargets = drawDescriptor.renderTargets.size();
+				vkRenderPass->attachements.resize(numTargets);
+
+				// Let's process all the "color" targets
+				for (uint32_t attachIdx = 0; attachIdx < numTargets; ++attachIdx)
+				{
+					// Grab the current descriptor to fill
+					VkAttachmentDescription& currentAttach = vkRenderPass->attachements[attachIdx];
+					VkAttachmentReference& currentAttachRef = vkRenderPass->attachementsRef[attachIdx];
+
+					// Grab the image we need to use
+					texture::VK_Image_Internal* vkImage = (texture::VK_Image_Internal*)(drawDescriptor.renderTargets[attachIdx]);
+
+					// Fill the attachment data
+					currentAttach.format = texture::GenericToVulkanTextureFormat(vkImage->textureDescriptor.format);
+					currentAttach.samples = VK_SAMPLE_COUNT_1_BIT;
+					currentAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+					currentAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+					currentAttach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+					currentAttach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+					currentAttach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+					currentAttach.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+					// Attachment references
+					currentAttachRef.attachment = attachIdx;
+					currentAttachRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				}
+
+				// Create our subpass
+				VkSubpassDescription subpass{};
+				subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+				subpass.colorAttachmentCount = numTargets;
+				subpass.pColorAttachments = vkRenderPass->attachementsRef.begin();
+
+				// Create the vulkan object
+				VkRenderPassCreateInfo renderPassInfo{};
+				renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+				renderPassInfo.attachmentCount = numTargets;
+				renderPassInfo.pAttachments = vkRenderPass->attachements.begin();
+				renderPassInfo.subpassCount = 1;
+				renderPassInfo.pSubpasses = &subpass;
+				assert_msg(vkCreateRenderPass(vkRenderEnvironement->logical_device, &renderPassInfo, nullptr, &vkRenderPass->renderPass) == VK_SUCCESS, "Failed to create render pass!");
+
+				// Convert to opaque type
+				return (RenderPassObject)vkRenderPass;
+			}
+
+			void destroy(RenderPassObject render_pass)
+			{
+				// Cast and make sure it is not null
+				VK_RenderPass_Internal* vkRenderPass = (VK_RenderPass_Internal*)render_pass;
+				assert(vkRenderPass != nullptr);
+
+				// Destroy the render pass
+				vkDestroyRenderPass(vkRenderPass->vkRenderEnvironement->logical_device, vkRenderPass->renderPass, nullptr);
+
+				// Destroy the internal structure
+				bento::make_delete<VK_RenderPass_Internal>(*vkRenderPass->_allocator, vkRenderPass);
+			}
+		}
     }
 }
 

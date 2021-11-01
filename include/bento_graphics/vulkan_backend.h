@@ -47,7 +47,7 @@ namespace bento
 
         namespace render_pass
         {
-            RenderPassObject create(RenderEnvironment renderEnvironment, bento::render_pass::RenderPassDescriptor& rpDescriptor, bento::IAllocator& allocator);
+            RenderPassObject create(RenderEnvironment renderEnvironment, bento::DrawDescriptor& drawDescriptor, bento::IAllocator& allocator);
             void destroy(RenderPassObject render_pass);
         }
 
