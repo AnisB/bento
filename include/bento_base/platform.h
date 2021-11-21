@@ -59,3 +59,7 @@
 #else
     #error Unsupported platfrom
 #endif
+
+// To avoid collision with of the macros with the functions
+#undef min
+#undef max

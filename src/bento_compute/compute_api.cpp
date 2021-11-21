@@ -1,30 +1,40 @@
-// Library includes
+﻿// Library includes
 #include "bento_compute/compute_api.h"
 #include "bento_base/security.h"
 #include "bento_collection/vector.h"
+#include "bento_collection/dynamic_string.h"
 
 #if defined(OPENCL_SUPPORTED)
 #include <CL/cl.h>
 #include <fstream>
 #include <algorithm>
-#undef min
-#undef max
 
 namespace bento
 {
 	struct OpenCLContext
 	{
-		cl_device_id device_id;
+		ALLOCATOR_BASED;
+		OpenCLContext(IAllocator& allocator): vendorName(allocator), _allocator(allocator) {}
+
+		// Context / device
 		cl_context context;
-		cl_int error_flag;
-		size_t global_dim;
-		bento::IAllocator* _allocator;
+		cl_device_id device_id;
+		
+		// Debug info
+		DynamicString vendorName;
+
+		// Dispatch parameters
+		size_t tileDimension;
+		size_t tileSize;
+		IVector3 tileResolution;
+		IAllocator& _allocator;
 	};
 
 	struct OpenCLCommandList
 	{
 		cl_command_queue commandList;
-		size_t global_dim;
+		size_t tileSize;
+		IVector3 tileResolution;
 		bento::IAllocator* _allocator;
 	};
 
@@ -59,11 +69,7 @@ namespace bento
 	ComputeContext create_compute_context(bento::IAllocator& allocator)
 	{
 		// Instantiate a cl context
-		OpenCLContext* new_context = bento::make_new<OpenCLContext>(allocator);
-		new_context->_allocator = &allocator;
-
-		// Declare the error holder
-		new_context->error_flag = 0;
+		OpenCLContext* new_context = bento::make_new<OpenCLContext>(allocator, allocator);
 
 		// Get the number of platforms
 		cl_uint platformIdCount = 0;
@@ -76,16 +82,16 @@ namespace bento
 		uint64_t best_platform = evaluate_platforms(platformIds);
 
 		// Fetch the id of the first available device
-		new_context->error_flag = clGetDeviceIDs(platformIds[(uint32_t)best_platform], CL_DEVICE_TYPE_ALL, 1, &new_context->device_id, NULL);
-	    if (new_context->error_flag != CL_SUCCESS)
+		cl_int error_flag = clGetDeviceIDs(platformIds[(uint32_t)best_platform], CL_DEVICE_TYPE_GPU, 1, &new_context->device_id, NULL);
+	    if (error_flag != CL_SUCCESS)
 	    {
 	        delete new_context;
 			assert_fail_msg("Can't fetch devices");
 			return 0;
 	    }
 
-	    // Create an Opencl context
-		new_context->context = clCreateContext(0, 1, &new_context->device_id, NULL, NULL, &new_context->error_flag);
+	    // Create the context
+		new_context->context = clCreateContext(0, 1, &new_context->device_id, NULL, NULL, &error_flag);
 	  	if (!new_context->context)
 	    {
        		delete new_context;
@@ -93,9 +99,25 @@ namespace bento
 	        return 0;
 	    }
 
-	    // Fetch the device info
-	    clGetDeviceInfo(new_context->device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), (void*)&new_context->global_dim, NULL);
-	    
+		// Get the vendor name
+		size_t vendorLength;
+		error_flag = clGetDeviceInfo(new_context->device_id, CL_DEVICE_VENDOR, 0, NULL, &vendorLength);
+		new_context->vendorName.resize((uint32_t)vendorLength);
+		error_flag = clGetDeviceInfo(new_context->device_id, CL_DEVICE_VENDOR, vendorLength, new_context->vendorName.c_str(), NULL);
+
+	    // Grab the maximal work group size
+		error_flag = clGetDeviceInfo(new_context->device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), (void*)&new_context->tileSize, NULL);
+
+		// Grab the maximal size of each individual tile
+		size_t tileResolutions[3];
+		error_flag = clGetDeviceInfo(new_context->device_id, CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof(size_t) * 3, (void*)&tileResolutions, NULL);
+		new_context->tileResolution.x = (uint32_t)tileResolutions[0];
+		new_context->tileResolution.y = (uint32_t)tileResolutions[1];
+		new_context->tileResolution.z = (uint32_t)tileResolutions[2];
+
+		// Grab the max work dimension
+		error_flag = clGetDeviceInfo(new_context->device_id, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, sizeof(size_t), (void*)&new_context->tileDimension, NULL);
+
 	    // All done lets go fella
 	    return (ComputeContext)new_context;
 	}
@@ -104,7 +126,7 @@ namespace bento
 	{
 		OpenCLContext* target_context = (OpenCLContext*) context;
 		clReleaseContext(target_context->context);
-		bento::make_delete<OpenCLContext>(*target_context->_allocator, target_context);
+		bento::make_delete<OpenCLContext>(target_context->_allocator, target_context);
 	}
 
 	ComputeCommandList create_command_list(ComputeContext context, bento::IAllocator& allocator)
@@ -112,9 +134,12 @@ namespace bento
 		OpenCLCommandList* newCommandList = bento::make_new<OpenCLCommandList>(allocator);
 		newCommandList->_allocator = &allocator;
 		OpenCLContext* target_context = (OpenCLContext*)context;
-		newCommandList->global_dim = target_context->global_dim;
-		newCommandList->commandList = clCreateCommandQueue(target_context->context, target_context->device_id, 0, &target_context->error_flag);
-		if (!newCommandList->commandList)
+		newCommandList->tileSize = target_context->tileSize;
+		newCommandList->tileResolution = target_context->tileResolution;
+
+		cl_int errorFlag;
+		newCommandList->commandList = clCreateCommandQueue(target_context->context, target_context->device_id, 0, &errorFlag);
+		if (!newCommandList->commandList || errorFlag != CL_SUCCESS)
 		{
 			assert_fail_msg("Can't create command list");
 			return 0;
@@ -146,11 +171,20 @@ namespace bento
 		error_flag = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
 		if (error_flag != CL_SUCCESS)
 		{
+			// Get the length of the log buffer
 			size_t len;
-			char buffer[2048];
-			clGetProgramBuildInfo(program, target_context->device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
+			error_flag = clGetProgramBuildInfo(program, target_context->device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &len);
+
+			// Read the build errors
+			bento::DynamicString errorString(target_context->_allocator);
+			errorString.resize((uint32_t)len);
+			error_flag = clGetProgramBuildInfo(program, target_context->device_id, CL_PROGRAM_BUILD_LOG, len, errorString.c_str(), NULL);
+
+			// Release the program
 			clReleaseProgram(program);
-			assert_fail_msg(buffer);
+
+			// Fail
+			assert_fail_msg(errorString.c_str());
 			return 0;
 		}
 		return (ComputeProgram)program;
@@ -173,31 +207,41 @@ namespace bento
 		return (ComputeKernel)kernel;
 	}
 
-	bool dispatch_kernel_1D(ComputeCommandList commandList, ComputeKernel kernel, uint64_t job_size)
+	uint32_t dispatch_tile_size(ComputeContext context)
 	{
-		OpenCLCommandList* currentCommandList = (OpenCLCommandList*)commandList;
-
-		size_t maxDimension = (size_t)std::min(job_size, currentCommandList->global_dim);
-		cl_int error_flag = clEnqueueNDRangeKernel(currentCommandList->commandList, (cl_kernel)kernel, 1, nullptr, &maxDimension, nullptr, 0, NULL, NULL);
-		if (error_flag != CL_SUCCESS)
-		{
-			assert_fail_msg("Can't execute kernel");
-			return false;
-		}
-		return true;
+		OpenCLContext* target_context = (OpenCLContext*)context;
+		return (uint32_t)target_context->tileSize;
 	}
 
-	bool dispatch_kernel_2D(ComputeCommandList commandList, ComputeKernel kernel, uint64_t job_size_0, uint64_t job_size_1)
+	IVector3 dispatch_tile_resolution(ComputeContext context)
+	{
+		OpenCLContext* target_context = (OpenCLContext*)context;
+		return target_context->tileResolution;
+	}
+
+	bool dispatch_kernel(ComputeCommandList commandList, ComputeKernel kernel, IVector3 numTilesParam, IVector3 tileSize)
 	{
 		OpenCLCommandList* currentCommandList = (OpenCLCommandList*)commandList;
 
-		size_t global_dim_0 = std::min(job_size_0, currentCommandList->global_dim);
-		size_t global_dim_1 = std::min(job_size_1, currentCommandList->global_dim);
-		size_t global_dim[2] = { global_dim_0, global_dim_1 };
-		cl_int error_flag = clEnqueueNDRangeKernel(currentCommandList->commandList, (cl_kernel)kernel, 2, nullptr, global_dim, nullptr, 0, NULL, NULL);
+		// The tile sizes
+		size_t tilesSizes[3];
+		tilesSizes[0] = std::min((size_t)tileSize.x, (size_t)currentCommandList->tileResolution.x);
+		tilesSizes[1] = std::min((size_t)tileSize.y, (size_t)currentCommandList->tileResolution.y);
+		tilesSizes[2] = std::min((size_t)tileSize.z, (size_t)currentCommandList->tileResolution.z);
+		size_t totalTileSize = tilesSizes[0] * tilesSizes[1] * tilesSizes[2];
+		assert(totalTileSize <= currentCommandList->tileSize);
+
+		// Compute the global workload per dimension
+		size_t globalWorkLoad[3];
+		globalWorkLoad[0] = numTilesParam.x * tilesSizes[0];
+		globalWorkLoad[1] = numTilesParam.y * tilesSizes[1];
+		globalWorkLoad[2] = numTilesParam.z * tilesSizes[2];
+
+		cl_int error_flag = clEnqueueNDRangeKernel(currentCommandList->commandList, (cl_kernel)kernel, 3, NULL, globalWorkLoad, tilesSizes, 0, NULL, NULL);
+
 		if (error_flag != CL_SUCCESS)
 		{
-			assert_fail_msg("Can't execute kernel");
+			assert_fail_msg("Kernel cannot be dispatched");
 			return false;
 		}
 		return true;
