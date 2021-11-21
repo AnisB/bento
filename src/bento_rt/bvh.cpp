@@ -151,7 +151,8 @@ namespace bento
 					BvhNode& current_node = b.nodes[node_idx];
 
 					// Fill the node data
-					current_node._box = _box;
+					current_node.min = _box.min;
+					current_node.max = _box.max;
 					current_node._numPrimitives = 0;
 					current_node._offset = child_idx;
 
@@ -162,7 +163,8 @@ namespace bento
 				else
 				{
 					BvhNode& current_node = b.nodes[node_idx];
-					current_node._box = _box;
+					current_node.min = _box.min;
+					current_node.max = _box.max;
 					current_node._numPrimitives = num_primitives;
 					current_node._offset = primitive_shift;
 					default_logger()->log(LogLevel::warning, "BVH", "Node is not well divided");
@@ -172,7 +174,8 @@ namespace bento
 			{
 				// Just assign everything to this node
 				BvhNode& current_node = b.nodes[node_idx];
-				current_node._box = _box;
+				current_node.min = _box.min;
+				current_node.max = _box.max;
 				current_node._numPrimitives = num_primitives;
 				current_node._offset = primitive_shift;
 			}
@@ -212,7 +215,7 @@ namespace bento
 			uint32_t result = UINT32_MAX;
 			const BvhNode& current_node = b.nodes[node_idx];
 			float tmp_dist = FLT_MAX;
-			if (intersect(ray.orig, ray.inv_dir, current_node._box.min, current_node._box.max, tmp_dist) && tmp_dist < dist)
+			if (intersect(ray.orig, ray.inv_dir, current_node.min, current_node.max, tmp_dist) && tmp_dist < dist)
 			{
 				// is it a leaf?
 				if (current_node._numPrimitives)

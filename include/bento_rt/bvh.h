@@ -42,12 +42,14 @@ namespace bento
 	// Node of the bounding volume hierarchy
 	struct BvhNode
 	{
+		// Min of the Box of the node
+		Vector3 min;
 		// The number of primitives that are owned by this node
 		uint32_t _numPrimitives;
+		// Max of the Box of the node
+		Vector3 max;
 		// Offset of the first primitive
 		uint32_t _offset;
-		// Bounding box of the node
-		bento::Box3 _box;
 	};
 
 	// Structure that holds the data of the bounding volume hierarchy acceleration structure
