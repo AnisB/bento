@@ -28,7 +28,7 @@ namespace bento
 	    {
 			standardDeviation += (first[i] - average) * (first[i] - average);
 	    }
-		standardDeviation = sqrt(standardDeviation / numElements);
+		standardDeviation = (uint64_t)sqrt(standardDeviation / (double)numElements);
     }
 
     void evaluate_avg_med_stddev(float* first, float* end, uint64_t numElements, float& average, float& median, float& standardDeviation)
@@ -53,6 +53,6 @@ namespace bento
 	    {
 			standardDeviation += (first[i] - average) * (first[i] - average);
 	    }
-		standardDeviation = sqrt(standardDeviation / numElements);
+		standardDeviation = sqrtf(standardDeviation / (float)numElements);
 	}
 }
